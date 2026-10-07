@@ -1,6 +1,7 @@
-# containment
+# prompt-injection-defense
 
-Production prompt-injection **defense kit** for Python agents.
+Python package **`containment`**: production **prompt-injection defense** for LLM agents (labels, default-deny policy broker, quarantine extract, detectors).
+
 
 **Honest claim (not a proof):** this library does **not** make models “injection-proof.”
 It constrains *authority*: even if malicious text influences a model, untrusted data
@@ -20,9 +21,16 @@ See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) and [docs/ARCHITECTURE.md](docs
 
 ## Install
 
-Python 3.12+ recommended.
+Python 3.12+ recommended. PyPI package name is `containment`.
 
 ```bash
+pip install "git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git"
+```
+
+From a clone:
+
+```bash
+git clone https://github.com/Hyper-AI-Lab/prompt-injection-defense.git
 cd prompt-injection-defense
 python3 -m venv .venv
 source .venv/bin/activate

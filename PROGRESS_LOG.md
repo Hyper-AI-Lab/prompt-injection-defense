@@ -452,3 +452,10 @@ Blocked: 38/38 attacks with policy ON; 0/38 with policy OFF. Flagged 1/34 benign
 - Prompt Guard 2 gated — skipped; Microsoft AGT + Invariant skipped for v1.0 (see DECISIONS.md)
 - Live Moltbook smoke skipped unless `CONTAINMENT_LIVE_MOLTBOOK=1`
 - No OS sandbox / network egress replacement; no adaptive-attack immunity claim
+
+
+## 2026-10-07 — GitHub rename for discoverability
+
+- Renamed public repo `Hyper-AI-Lab/containment` → `Hyper-AI-Lab/prompt-injection-defense` (GitHub redirects the old URL).
+- Topics: prompt-injection, llm-security, ai-agents, agent-security, python, security.
+- Python package name remains `containment`.

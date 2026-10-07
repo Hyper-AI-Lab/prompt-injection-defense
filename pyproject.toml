@@ -10,7 +10,12 @@ readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.12"
 authors = [{ name = "Kirill Mitrofanov" }]
-keywords = ["prompt-injection", "security", "agents", "llm", "policy"]
+keywords = ["prompt-injection", "prompt-injection-defense", "llm-security", "ai-agents", "security", "policy"]
+
+[project.urls]
+Homepage = "https://github.com/Hyper-AI-Lab/prompt-injection-defense"
+Repository = "https://github.com/Hyper-AI-Lab/prompt-injection-defense"
+Issues = "https://github.com/Hyper-AI-Lab/prompt-injection-defense/issues"
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Intended Audience :: Developers",
