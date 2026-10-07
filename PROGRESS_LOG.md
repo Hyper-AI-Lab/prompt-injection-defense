@@ -2141,3 +2141,123 @@ Confirm `origin/main` carries **containment 1.5.1** after Bar C+D audit harden.
 Bar C+D plan-match matrix + swarm ISSUES fixed or residual-accepted; integrity clean; gate green; pushed.
 
 ### Verdict: VERIFIED
+
+
+## Bar E Eval Card — Step 1 Baseline — 2026-10-08 00:55 JST
+
+### Scope
+Baseline gate before Bar E (Eval Card → 1.6.0). No code changes.
+
+### Evidence
+- HEAD: `21c1cf9` (`21c1cf9c2a2e7b0897018f1e7abddbac1e565224`)
+- Tip message: docs append Bar C+D audit step-8 post-push
+- Version: pyproject + `__version__` = **1.5.1**
+- `scripts/release_gate.sh` exit 0
+- pytest: **293 passed**, 2 skipped
+- Eval (policy ON): attacks 53, benign 36; **ASR 0.0000**; FPR 0.0278; utility 0.9722; detector_block_rate 0.7358; policy_block_rate 1.0000; blocked 53/53; flagged 1/36
+- Untracked: `EVAL_CARD_PLAN.md` (plan as law)
+- `artifacts/` not in `.gitignore` yet (will add in Step 5/6 if samples generated on demand)
+
+### Verdict: VERIFIED
+
+
+## Bar E Eval Card — Step 2 Card schema + writer — 2026-10-08 00:56 JST
+
+### Scope
+Implement `src/containment/eval_card.py` + hermetic tests (no CLI yet).
+
+### Evidence
+- Module: flat `src/containment/eval_card.py` (no empty `evals/` package)
+- Types: frozen `PolicySliceMetrics`, `EvalCard`; helpers `build_card`, `write_json`, `write_markdown`, `render_markdown`, `on_asr_is_ok`, `control_is_ok`
+- Thresholds: `ON_ASR_REQUIRED=0.0` with `ASR_ROUND_DIGITS=4` (matches eval_runner.as_dict)
+- Reuses `EvalMetrics` from eval_runner — no metrics fork
+- Tests: `tests/test_eval_card.py` — **7 passed** (JSON roundtrip, markdown metrics, control/on_asr flags, corpus mismatch)
+- Markdown scope language: fixture-only; explicitly not SOTA / AgentDojo / leaderboard
+
+### Verdict: VERIFIED
+
+
+## Bar E Eval Card — Step 3 Harness + CLI — 2026-10-08 00:56 JST
+
+### Scope
+Wire ON/OFF harness via `run_eval`; CLI `containment-eval-card`; pyproject script; hermetic CLI tests.
+
+### Evidence
+- `generate_card` / `write_card_artifacts` / `main` in `eval_card.py` — metrics from `eval_runner.run_eval` only
+- Console script: `containment-eval-card = containment.eval_card:main`
+- Fail-closed: exit 1 when `on_asr_ok` or `control_ok` false (artifacts still written)
+- Tests: `tests/test_eval_card.py` — **10 passed** (incl. generate_card, CLI write, fail-closed monkeypatch, `-m containment.eval_card`)
+- Ruff clean on new files after UP017/F541 fix
+
+### Verdict: VERIFIED
+
+
+## Bar E Eval Card — Step 4 Gate thresholds — 2026-10-08 00:57 JST
+
+### Scope
+Lock prove-it thresholds in code + tests; keep release_gate on existing single ON eval; card CLI is separate prove-it smoke.
+
+### Evidence
+- Constants: `ON_ASR_REQUIRED=0.0`, `ASR_ROUND_DIGITS=4` in `eval_card.py`
+- Tests: `on_asr_is_ok` / `control_is_ok` + `test_threshold_constants_match_docs`
+- `scripts/release_gate.sh`: comment documents that `containment-eval-card` is **not** in CI gate (avoids doubling fixture runtime); thresholds pointed to eval_card + docs/EVAL_CARD.md
+- Choice: release_gate stays on `containment eval` (policy ON only); card CLI is prove-it / citable artifact generator (fail-closed)
+
+### Verdict: VERIFIED
+
+
+## Bar E Eval Card — Step 5 Docs + exports — 2026-10-08 00:57 JST
+
+### Scope
+`docs/EVAL_CARD.md`; README / DECISIONS / SKILL / AGENT_INSTALL; public exports; gitignore artifacts.
+
+### Evidence
+- Docs: `docs/EVAL_CARD.md` (scope, thresholds, generate, vs `containment eval`)
+- README: offline eval + card CLI blurb; docs layout mentions eval card
+- DECISIONS: ADOPT Bar E; Bar D non-goal updated (eval card shipped)
+- SKILL: eval honesty + References link
+- AGENT_INSTALL: §11 Eval card
+- Exports: `EvalCard`, `PolicySliceMetrics`, `build_card`, `generate_card`, `write_card_artifacts` in `__init__`
+- `.gitignore`: `artifacts/`
+- Placeholder scan on new surfaces: clean
+
+### Verdict: VERIFIED
+
+
+## Bar E Eval Card — Step 5 Docs + exports (re-verify after circular-import fix) — 2026-10-08 00:57 JST
+
+### Scope
+Fix `eval_card` ↔ `__init__` circular import; confirm exports + docs still land.
+
+### Evidence
+- `eval_card` uses `importlib.metadata.version("containment")` via `_package_version()` (no package-root import at load)
+- `from containment import EvalCard, generate_card` works
+- `tests/test_eval_card.py` green after fix
+- Ruff I001 on `__init__` fixed
+- Prior Step 5 PROGRESS_LOG entry stands for docs/gitignore/exports; this entry re-verifies integrity
+
+### Verdict: VERIFIED
+
+
+## Bar E Eval Card — Step 6 Final prove-it (pre-push) — 2026-10-08 00:58 JST
+
+### Scope
+Bump **1.6.0**; release_gate; containment-eval-card prove-it; commit + push origin/main.
+
+### Evidence
+- Version: pyproject + `__version__` = **1.6.0**
+- `scripts/release_gate.sh` exit 0; ruff clean; placeholder scan clean
+- pytest: **304 passed**, 2 skipped
+- Eval ON (gate): ASR **0.0000**; FPR 0.0278; utility 0.9722; blocked 53/53
+- `containment-eval-card --suite fixtures --out-dir artifacts/eval-card` → gate=PASS
+  - ON ASR 0.0000; OFF ASR 1.0000; control_ok=True; on_asr_ok=True
+  - Wrote (gitignored): `artifacts/eval-card/eval-card.json`, `eval-card.md`
+- Card SHA recorded at generate time: baseline HEAD `21c1cf9` (pre-release commit)
+- Ship set: `eval_card.py`, `tests/test_eval_card.py`, `docs/EVAL_CARD.md`, `EVAL_CARD_PLAN.md`, docs/scripts/exports, `.gitignore` artifacts/
+
+### Residuals accepted
+- Card not inside release_gate (by design; documented)
+- Generated card artifacts gitignored (generate on demand)
+- Prior Bar C+D residuals unchanged
+
+### Verdict: VERIFIED (pre-push; push next)

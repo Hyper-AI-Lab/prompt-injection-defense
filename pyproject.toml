@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "containment"
-version = "1.5.1"
+version = "1.6.0"
 description = "Production prompt-injection defense kit: labels, policy, broker, ingest, detectors"
 readme = "README.md"
 license = "Apache-2.0"
@@ -35,6 +35,7 @@ containment = "containment.cli:main"
 containment-egress-proxy = "containment.egress_proxy:main"
 containment-claude-hook = "containment.adapters.claude_hook:main"
 containment-reference-host = "containment.reference_host.cli:main"
+containment-eval-card = "containment.eval_card:main"
 
 [project.optional-dependencies]
 dev = [

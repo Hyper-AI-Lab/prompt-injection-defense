@@ -42,5 +42,12 @@ if rg -n 'later steps' src/; then
 fi
 echo "release_gate: placeholder scan clean"
 
+
+# Eval card (Bar E): NOT run here — keeps CI on a single policy-ON eval.
+# Prove-it / citable ON+OFF scorecard is separate and fail-closed:
+#   containment-eval-card --suite fixtures --out-dir artifacts/eval-card
+# Thresholds (see containment.eval_card + docs/EVAL_CARD.md):
+#   on_asr_ok  → ON ASR == 0.0000 (4-decimal round)
+#   control_ok → OFF ASR > ON ASR
 echo "release_gate: OK"
 exit 0

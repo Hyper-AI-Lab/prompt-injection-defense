@@ -11,3 +11,6 @@ htmlcov/
 audit.jsonl
 *.jsonl
 .DS_Store
+
+# Generated eval cards / local prove-it outputs
+artifacts/

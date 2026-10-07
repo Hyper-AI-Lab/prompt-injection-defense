@@ -158,12 +158,22 @@ python -m containment.cli eval --suite fixtures
 python -m containment.cli eval --suite fixtures --no-policy
 ```
 
+Citable ON+OFF scorecard (Markdown + JSON; fail-closed prove-it):
+
+```bash
+containment-eval-card --suite fixtures --out-dir artifacts/eval-card
+```
+
+See [docs/EVAL_CARD.md](docs/EVAL_CARD.md). Fixture-only offline rates — not a
+public leaderboard or SOTA claim. `release_gate.sh` keeps the single ON eval;
+the card CLI is the separate prove-it smoke.
+
 ## Package layout
 
 - `src/containment/` — labels, policy, broker, ingest, detectors, quarantine, moltbook, adapters (Bar C), reference_host (Bar D), CLI
 - `policies/default_deny.yaml` — default-deny tool policy
 - `fixtures/attacks` / `fixtures/benign` — offline eval corpus
-- `docs/` — threat model, architecture, agent install, host hardening
+- `docs/` — threat model, architecture, agent install, host hardening, eval card
 - `SKILL.md` — procedure for Grok bots / agents
 
 ## Agent install

@@ -36,6 +36,13 @@ from containment.egress_resolve import (
     resolve_and_pin,
 )
 from containment.enterprise import EnterpriseHost, build_enterprise_host
+from containment.eval_card import (
+    EvalCard,
+    PolicySliceMetrics,
+    build_card,
+    generate_card,
+    write_card_artifacts,
+)
 from containment.host import (
     AuditShipper,
     EgressProvider,
@@ -89,7 +96,7 @@ from containment.url_guard import (
     parse_egress_url,
 )
 
-__version__ = "1.5.1"
+__version__ = "1.6.0"
 
 __all__ = [
     "ALLOWLIST_SUMMARY_SCHEMA",
@@ -119,6 +126,11 @@ __all__ = [
     "PinnedEgressProvider",
     "ProxyEgressProvider",
     "EnvSecretProvider",
+    "EvalCard",
+    "PolicySliceMetrics",
+    "build_card",
+    "generate_card",
+    "write_card_artifacts",
     "ExtractResult",
     "FileAuditShipper",
     "FileSecretProvider",

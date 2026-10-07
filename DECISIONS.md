@@ -317,5 +317,28 @@ user settings; claiming hooks cannot be disabled by the host.
 - Docs: `docs/REFERENCE_HOST.md`. Version bump to 1.5.0 deferred to final prove-it.
 
 ### Explicit non-goals
-Eval card / release ritual / bot playbook; auto-wire Claude.app; LLM round-trips
+Release ritual / bot playbook; auto-wire Claude.app; LLM round-trips
 in CI; claiming OS isolation from `isolation_declared=True`.
+(Eval card shipped as Bar E → 1.6.0.)
+
+---
+
+## 2026-10-08 — Eval card Bar E (→ 1.6.0)
+
+### Eval card (ON + OFF scorecard) — **ADOPT**
+- Module `containment.eval_card`: `EvalCard` / `PolicySliceMetrics`, `build_card`,
+  `generate_card` (calls `eval_runner.run_eval` twice — no metrics fork),
+  Markdown + JSON writers.
+- CLI `containment-eval-card` writes `eval-card.md` + `eval-card.json` under a
+  caller out-dir (default `artifacts/eval-card/`, gitignored).
+- Fail-closed: exit 1 unless `on_asr_ok` (ON ASR == 0.0000 after 4-decimal
+  round) and `control_ok` (OFF ASR > ON ASR).
+- Docs: `docs/EVAL_CARD.md`. `release_gate.sh` stays on single policy-ON eval;
+  card CLI is prove-it / citation smoke (documented in gate comments).
+- Version bump to 1.6.0 deferred to final prove-it.
+
+### Explicit non-goals
+Live AgentDojo / hosted shields / LLM round-trips in CI; release ritual / bot
+playbook; expanding fixture corpus unless a bug requires it; SOTA or FedRAMP
+claims.
+

@@ -193,3 +193,18 @@ Details: [REFERENCE_HOST.md](REFERENCE_HOST.md). Live Moltbook is optional
 (`CONTAINMENT_LIVE_MOLTBOOK=1` + `--live-moltbook`); CI stays offline.
 `isolation_declared` in the demo is honor-system — production hosts must
 actually isolate (see §8 / HOST_HARDENING.md).
+
+## 11. Eval card (Bar E)
+
+Generate a citable ON+OFF scorecard after install:
+
+```bash
+containment-eval-card --suite fixtures --out-dir artifacts/eval-card
+```
+
+Expect exit 0 with `on_asr_ok` (ON ASR 0.0000) and `control_ok` (OFF ASR worse).
+Artifacts land under `artifacts/eval-card/` (gitignored). Details:
+[EVAL_CARD.md](EVAL_CARD.md). This is fixture-only offline evidence — not a
+public leaderboard. `release_gate.sh` still runs a single policy-ON eval; the
+card CLI is the prove-it smoke for citation.
+

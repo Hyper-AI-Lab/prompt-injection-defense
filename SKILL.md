@@ -82,9 +82,12 @@ Before inventing a custom host, run `containment-reference-host --scenario all` 
 ```bash
 python -m containment.cli eval --suite fixtures
 python -m containment.cli eval --suite fixtures --no-policy   # ASR must rise
+containment-eval-card --suite fixtures --out-dir artifacts/eval-card
 ```
 
-Report measured ASR / FPR / utility; do not claim certification or zero residual risk.
+Report measured ASR / FPR / utility from the card or CLI; do not claim
+certification, SOTA, or zero residual risk. Card thresholds: ON ASR == 0.0000
+and OFF ASR strictly worse. See `docs/EVAL_CARD.md`.
 
 ## References
 
@@ -93,6 +96,7 @@ Report measured ASR / FPR / utility; do not claim certification or zero residual
 - `docs/AGENT_INSTALL.md`
 - `docs/HOST_HARDENING.md`
 - `docs/REFERENCE_HOST.md`
+- `docs/EVAL_CARD.md`
 - `docs/RUNTIME_ADAPTER.md`
 - `docs/OWASP_LLM_TOP10_MAP.md`
 - `policies/default_deny.yaml`
