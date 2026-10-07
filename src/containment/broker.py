@@ -14,6 +14,7 @@ from containment.detectors.base import CascadeResult
 from containment.detectors.cascade import PRIVILEGED_SINKS, privileged_sink_fail_closed
 from containment.host.checklist import HostChecklist
 from containment.host.rate_limit import RateLimitGate
+from containment.host.secrets import SecretError
 from containment.intent import IntentError, IntentVerifier, SignedIntent
 from containment.plan import Plan
 from containment.policy import PolicyEngine
@@ -106,6 +107,7 @@ class ToolBroker:
         require_host_gate: bool = False,
         host_checklist: HostChecklist | None = None,
         rate_limit: RateLimitGate | None = None,
+        ship_audit: bool | None = None,
     ) -> None:
         self.policy = policy
         self.audit = audit
@@ -120,6 +122,33 @@ class ToolBroker:
         self.require_host_gate = bool(require_host_gate or self.enterprise_profile)
         self.host_checklist = host_checklist
         self.rate_limit = rate_limit
+        self.ship_audit = (
+            bool(ship_audit) if ship_audit is not None else self.require_host_gate
+        )
+
+
+    def _record_decision(
+        self, action: ProposedAction, decision: PolicyDecision
+    ) -> None:
+        """Append audit decision; optionally ship under HostGate (fail-closed)."""
+        self.audit.append_decision(action, decision)
+        if not self.ship_audit:
+            return
+        checklist = self.host_checklist
+        if checklist is None or checklist.audit_shipper is None:
+            return
+        try:
+            checklist.audit_shipper.ship_file(self.audit.path)
+        except Exception as exc:
+            if self.require_host_gate:
+                raise SecurityViolation(
+                    f"audit ship failed: {exc}",
+                    decision=PolicyDecision(
+                        effect="deny",
+                        rule_id="host_audit_ship_failed",
+                        reason=f"audit ship failed: {exc}",
+                    ),
+                ) from exc
 
     def secure_execute(
         self,
@@ -140,7 +169,7 @@ class ToolBroker:
                     rule_id="host_gate_required",
                     reason="host checklist required but not provided",
                 )
-                self.audit.append_decision(action, decision)
+                self._record_decision(action, decision)
                 raise SecurityViolation(decision.reason, decision=decision)
             if not self.host_checklist.ok():
                 codes = ",".join(self.host_checklist.failures())
@@ -149,8 +178,30 @@ class ToolBroker:
                     rule_id="host_checklist_failed",
                     reason=f"host checklist failed: {codes}",
                 )
-                self.audit.append_decision(action, decision)
+                self._record_decision(action, decision)
                 raise SecurityViolation(decision.reason, decision=decision)
+            # Bind SecretProvider capability secret to the minter (H2).
+            provider = self.host_checklist.secret_provider
+            if provider is not None:
+                name = self.host_checklist.capability_secret_name
+                try:
+                    provided = provider.get_bytes(name)
+                except SecretError as exc:
+                    decision = PolicyDecision(
+                        effect="deny",
+                        rule_id="host_secret_mismatch",
+                        reason=f"capability secret unavailable: {exc}",
+                    )
+                    self._record_decision(action, decision)
+                    raise SecurityViolation(decision.reason, decision=decision) from exc
+                if not self.minter.matches_secret(provided):
+                    decision = PolicyDecision(
+                        effect="deny",
+                        rule_id="host_secret_mismatch",
+                        reason="capability secret does not match minter",
+                    )
+                    self._record_decision(action, decision)
+                    raise SecurityViolation(decision.reason, decision=decision)
 
         # 0) Signed intent gate (enterprise / require_signed_intent).
         if self.require_signed_intent:
@@ -160,7 +211,7 @@ class ToolBroker:
                     rule_id="signed_intent_required",
                     reason="signed intent required but not provided",
                 )
-                self.audit.append_decision(action, decision)
+                self._record_decision(action, decision)
                 raise SecurityViolation(decision.reason, decision=decision)
             if self.intent_signer is None:
                 decision = PolicyDecision(
@@ -168,7 +219,7 @@ class ToolBroker:
                     rule_id="signed_intent_required",
                     reason="intent_signer not configured",
                 )
-                self.audit.append_decision(action, decision)
+                self._record_decision(action, decision)
                 raise SecurityViolation(decision.reason, decision=decision)
             try:
                 env = self.intent_signer.verify(intent, plan=plan)
@@ -178,7 +229,7 @@ class ToolBroker:
                     rule_id="signed_intent_invalid",
                     reason=str(exc),
                 )
-                self.audit.append_decision(action, decision)
+                self._record_decision(action, decision)
                 raise SecurityViolation(decision.reason, decision=decision) from exc
             principal_authenticated = env.principal_authenticated
 
@@ -189,14 +240,14 @@ class ToolBroker:
                 rule_id="unknown_tool",
                 reason=f"unknown tool {action.tool!r}",
             )
-            self.audit.append_decision(action, decision)
+            self._record_decision(action, decision)
             raise SecurityViolation(decision.reason, decision=decision)
 
         # 2) Schema validation hook.
         try:
             self.schema_validate(action.tool, action.arguments)
         except SecurityViolation as exc:
-            self.audit.append_decision(action, exc.decision)
+            self._record_decision(action, exc.decision)
             raise
         except Exception as exc:
             decision = PolicyDecision(
@@ -204,7 +255,7 @@ class ToolBroker:
                 rule_id="schema",
                 reason=str(exc),
             )
-            self.audit.append_decision(action, decision)
+            self._record_decision(action, decision)
             raise SecurityViolation(str(exc), decision=decision) from exc
 
         # 3) Empty-label fail-closed on privileged / egress sinks (H1).
@@ -217,7 +268,7 @@ class ToolBroker:
                     "input_labels (fail closed)"
                 ),
             )
-            self.audit.append_decision(action, decision)
+            self._record_decision(action, decision)
             raise SecurityViolation(decision.reason, decision=decision)
 
         # 3b) Plan expiry (M4).
@@ -227,7 +278,7 @@ class ToolBroker:
                 rule_id="plan_expired",
                 reason=f"plan expired at unix {plan.expiry_unix}",
             )
-            self.audit.append_decision(action, decision)
+            self._record_decision(action, decision)
             raise SecurityViolation(decision.reason, decision=decision)
 
         # 3c) Plan step binding (M1): step id must exist and tool must match.
@@ -239,7 +290,7 @@ class ToolBroker:
                 rule_id="plan_step_unknown",
                 reason=f"unknown plan_step {action.plan_step!r}",
             )
-            self.audit.append_decision(action, decision)
+            self._record_decision(action, decision)
             raise SecurityViolation(decision.reason, decision=decision) from None
         if step.tool != action.tool:
             decision = PolicyDecision(
@@ -250,7 +301,7 @@ class ToolBroker:
                     f"!= action tool {action.tool!r}"
                 ),
             )
-            self.audit.append_decision(action, decision)
+            self._record_decision(action, decision)
             raise SecurityViolation(decision.reason, decision=decision)
 
         # 4) Policy evaluate.
@@ -290,7 +341,7 @@ class ToolBroker:
                 )
 
         # 5) Audit append (every decision).
-        self.audit.append_decision(action, decision)
+        self._record_decision(action, decision)
 
         # 6) Deny path.
         if decision.effect == "deny":
@@ -316,7 +367,7 @@ class ToolBroker:
                         ),
                         display=decision.display,
                     )
-                    self.audit.append_decision(action, decision)
+                    self._record_decision(action, decision)
                     raise SecurityViolation(decision.reason, decision=decision)
 
         # 7b) Rate / spend gate for privileged sinks (optional when configured).
@@ -331,7 +382,7 @@ class ToolBroker:
                     ),
                     display=decision.display,
                 )
-                self.audit.append_decision(action, decision)
+                self._record_decision(action, decision)
                 raise SecurityViolation(decision.reason, decision=decision)
 
         # 8) Mint one-use capability.

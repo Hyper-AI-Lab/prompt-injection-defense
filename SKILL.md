@@ -30,7 +30,7 @@ Default Stage-1 is **RulesOnly**. Optional PIGuard: `pip install -e ".[dev,ml]"`
 follow `docs/AGENT_INSTALL.md` (§7 `CONTAINMENT_STAGE1` / `make_stage1_cascade`).
 Host sandbox, egress proxy, and secret vaults remain **required**
 (`docs/AGENT_INSTALL.md` §8; `docs/HOST_HARDENING.md`). Prefer
-`build_enterprise_host()` so HostGate + signed intents are on. Pin egress with
+`build_enterprise_host()` so HostGate + signed intents + `EgressProvider` are on. Pin egress with
 `CONTAINMENT_EGRESS_PINNED=1` or `CONTAINMENT_EGRESS_PROXY` /
 `containment-egress-proxy`. Do not claim zero residual risk.
 

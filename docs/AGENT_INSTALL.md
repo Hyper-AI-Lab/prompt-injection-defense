@@ -36,7 +36,7 @@ host = build_enterprise_host(
     audit_ship_destination=ROOT / "audit-shipped.jsonl",
     secrets_dir=ROOT / "secrets",
     isolation_declared=True,   # you run a real OS/container sandbox
-    egress_configured=True,    # or proxy_url="http://127.0.0.1:8888"
+    egress_configured=True,    # PinnedEgressProvider; or proxy_url= / egress_provider=
     known_tools=frozenset({"web.fetch", "email.send", "http.post"}),
 )
 broker = host.broker  # require_host_gate=True; signed intents required

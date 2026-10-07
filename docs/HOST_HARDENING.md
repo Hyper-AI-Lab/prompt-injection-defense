@@ -31,7 +31,7 @@ host = build_enterprise_host(
  audit_ship_destination=ROOT / "audit-shipped.jsonl",
  secrets_dir=ROOT / "secrets", # files: capability, intent
  isolation_declared=True, # you run a real sandbox
- egress_configured=True, # or pass proxy_url=
+ egress_configured=True, # builds PinnedEgressProvider; or proxy_url= / egress_provider=
  known_tools=frozenset({"web.fetch", "email.send"}),
 )
 # host.broker.require_host_gate is True; signed intents required
@@ -39,7 +39,7 @@ host = build_enterprise_host(
 ```
 
 Production path: put HMAC material in `secrets_dir` or env
-(`secrets_env_prefix="CONTAINMENT_SECRET_"`), never inline `secret=b"..."` in
+(`secrets_env_prefix="CONTAINMENT_SECRET_"`), never inline raw secret bytes in
 source. Tests may use a temp `FileSecretProvider`.
 
 ## Run `containment-egress-proxy`
@@ -49,7 +49,7 @@ credential injection. Not a clone of Hermes iron-proxy.
 
 ```bash
 # listen (port 0 = ephemeral; prints listening URL)
-containment-egress-proxy --host 127.0.0.1 --port 8888
+containment-egress-proxy --listen 127.0.0.1:8888
 
 # point fetch / moltbook at it
 export CONTAINMENT_EGRESS_PROXY=http://127.0.0.1:8888
@@ -68,11 +68,14 @@ mint and privileged execute unless `HostChecklist.ok()`:
 
 - `isolation_declared` - operator asserts process/container isolation
 - `secret_provider` - non-None `SecretProvider`
-- `egress_configured` - True when proxy URL or pinned egress is configured
+- `egress_provider` - non-None `EgressProvider` (`ProxyEgressProvider` or
+  `PinnedEgressProvider`); `egress_configured` is a read-only compat property
 - `audit_shipper` - non-None `AuditShipper`
 
 Incomplete checklist → deny `host_checklist_failed`. Missing checklist →
-`host_gate_required`.
+`host_gate_required`. When the checklist is complete, HostGate also binds
+`secret_provider.get_bytes(capability_secret_name)` to the minter via
+constant-time `CapabilityMinter.matches_secret`; mismatch → `host_secret_mismatch`.
 
 `build_enterprise_host` fails closed with `ValueError` if isolation/egress are
 not declared before returning a broker.
@@ -96,8 +99,11 @@ files = FileSecretProvider("/var/run/containment/secrets")
 ## AuditShipper
 
 `FileAuditShipper(destination)` appends JSONL lines from an `AuditLog` path.
-Export is tamper-evidence only, not WORM. Schedule `ship_file(audit.path)` from
-your host cron/SIEM pipeline.
+Export is tamper-evidence only, not WORM. Under HostGate with `ship_audit`
+(default on when `require_host_gate`), the broker ships after each recorded
+decision and fails closed if ship raises. Hosts can also call
+`export_hmac_tip(audit_path, tip_key=...)` for an HMAC over the chain tip, or
+schedule `ship_file(audit.path)` from cron/SIEM.
 
 ## Pinned egress / env
 

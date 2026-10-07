@@ -47,8 +47,9 @@ is influenced by injected instructions.
     resolve-pin helpers; in-repo `containment-egress-proxy` (resolve-pin-forward,
     not TLS MITM).
 11. **HostGate** — `HostChecklist` (isolation declaration, `SecretProvider`,
-    egress configured, `AuditShipper`); fail-closed under enterprise /
-    `require_host_gate`. See `docs/HOST_HARDENING.md`.
+    `EgressProvider`, `AuditShipper`); capability secret bind to minter;
+    optional audit ship on each decision (fail-closed under HostGate). See
+    `docs/HOST_HARDENING.md`.
 12. **RateLimitGate** — optional token-bucket on privileged broker mint (LLM10).
 
 ## Non-goals / residual risk
@@ -78,6 +79,11 @@ is influenced by injected instructions.
   check-then-connect gaps when used. Residual remains if the host bypasses both
   and reconnects after a separate check. Moltbook disables redirects and caps
   read size; third-party sites remain untrusted content sources.
+
+- **Accepted HostGate residuals (Bar B audit):** `RateLimitGate` remains optional
+  under `build_enterprise_host` (configure when spend caps are required).
+  `isolation_declared` is an honor-system declaration. Opener DI and proxy-wins-
+  over-pin stay intentional bypasses for hermetic tests / trusted host proxies.
 - **Multi-process capability store residual:** `MemoryConsumeStore` does not synchronize
   across processes (double-consume possible under multi-worker hosts). Use
   `SqliteConsumeStore` or optional `RedisConsumeStore` (`containment[redis]`) when

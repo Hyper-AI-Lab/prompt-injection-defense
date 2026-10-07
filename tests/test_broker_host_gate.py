@@ -15,6 +15,7 @@ from containment.host import (
     FileAuditShipper,
     FileSecretProvider,
     HostChecklist,
+    PinnedEgressProvider,
 )
 from containment.intent import IntentSigner
 from containment.labels import SecurityLabel
@@ -71,14 +72,19 @@ def _action() -> ProposedAction:
     )
 
 
-def _complete_checklist(tmp_path: Path) -> HostChecklist:
+CAP_SECRET = b"x" * 32
+
+
+def _complete_checklist(
+    tmp_path: Path, *, secret: bytes = CAP_SECRET
+) -> HostChecklist:
     secrets_root = tmp_path / "secrets"
     secrets_root.mkdir()
-    (secrets_root / "hmac").write_bytes(b"host-gate-secret-bytes")
+    (secrets_root / "capability").write_bytes(secret)
     return HostChecklist(
         isolation_declared=True,
         secret_provider=FileSecretProvider(secrets_root),
-        egress_configured=True,
+        egress_provider=PinnedEgressProvider(),
         audit_shipper=FileAuditShipper(tmp_path / "shipped-audit.jsonl"),
     )
 
@@ -87,7 +93,7 @@ def _broker(tmp_path: Path, **kwargs) -> ToolBroker:
     defaults = dict(
         policy=PolicyEngine.from_yaml_path(POLICY_PATH),
         audit=AuditLog(tmp_path / "a.jsonl"),
-        minter=CapabilityMinter(secret=b"x" * 32),
+        minter=CapabilityMinter(secret=CAP_SECRET),
         known_tools=frozenset({"web.fetch"}),
     )
     defaults.update(kwargs)
@@ -106,7 +112,7 @@ def test_require_host_gate_incomplete_checklist_denies(tmp_path: Path) -> None:
     incomplete = HostChecklist(
         isolation_declared=False,
         secret_provider=EnvSecretProvider(),
-        egress_configured=True,
+        egress_provider=PinnedEgressProvider(),
         audit_shipper=FileAuditShipper(tmp_path / "ship.jsonl"),
     )
     broker = _broker(
@@ -142,3 +148,46 @@ def test_require_host_gate_false_skips_host_check(tmp_path: Path) -> None:
     result = broker.secure_execute(_action(), plan=_plan())
     assert result.decision.effect == "allow"
     assert result.capability is not None
+
+
+
+def test_host_secret_mismatch_denies(tmp_path: Path) -> None:
+    signer = IntentSigner(SECRET)
+    plan = _plan()
+    signed = signer.sign(_envelope(), plan=plan, ttl_seconds=3600.0)
+    # Checklist secret differs from minter secret
+    checklist = _complete_checklist(tmp_path, secret=b"y" * 32)
+    broker = _broker(
+        tmp_path,
+        enterprise_profile=True,
+        intent_signer=signer,
+        host_checklist=checklist,
+        minter=CapabilityMinter(secret=CAP_SECRET),
+    )
+    with pytest.raises(SecurityViolation) as ei:
+        broker.secure_execute(
+            _action(), plan=plan, intent=signed, principal_authenticated=False
+        )
+    assert ei.value.decision.rule_id == "host_secret_mismatch"
+
+
+def test_complete_checklist_ships_audit(tmp_path: Path) -> None:
+    signer = IntentSigner(SECRET)
+    plan = _plan()
+    signed = signer.sign(_envelope(), plan=plan, ttl_seconds=3600.0)
+    ship_dest = tmp_path / "shipped-audit.jsonl"
+    checklist = _complete_checklist(tmp_path)
+    # rebuild shipper path we know
+    assert isinstance(checklist.audit_shipper, FileAuditShipper)
+    broker = _broker(
+        tmp_path,
+        enterprise_profile=True,
+        intent_signer=signer,
+        host_checklist=checklist,
+    )
+    result = broker.secure_execute(
+        _action(), plan=plan, intent=signed, principal_authenticated=False
+    )
+    assert result.decision.effect == "allow"
+    assert ship_dest.is_file()
+    assert ship_dest.read_text(encoding="utf-8").strip()

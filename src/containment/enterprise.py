@@ -1,4 +1,4 @@
-"""Compose an enterprise host: secrets, checklist, broker, optional egress hint."""
+"""Compose an enterprise host: secrets, checklist, broker, egress provider."""
 
 from __future__ import annotations
 
@@ -11,6 +11,11 @@ from containment.capability import CapabilityMinter
 from containment.capability_store import CapabilityConsumeStore
 from containment.host.audit_ship import AuditShipper, FileAuditShipper
 from containment.host.checklist import HostChecklist
+from containment.host.egress import (
+    EgressProvider,
+    PinnedEgressProvider,
+    ProxyEgressProvider,
+)
 from containment.host.rate_limit import RateLimitGate
 from containment.host.secrets import (
     EnvSecretProvider,
@@ -35,6 +40,7 @@ class EnterpriseHost:
     intent_signer: IntentVerifier
     rate_limit: RateLimitGate | None
     proxy_url: str | None
+    egress_provider: EgressProvider
 
 
 def _resolve_secret_provider(
@@ -65,6 +71,25 @@ def _resolve_secret_provider(
     return EnvSecretProvider(prefix=secrets_env_prefix)
 
 
+def _resolve_egress_provider(
+    *,
+    egress_provider: EgressProvider | None,
+    proxy_url: str | None,
+    egress_configured: bool,
+) -> EgressProvider:
+    """Require a real provider: explicit, from proxy_url, or pinned flag."""
+    if egress_provider is not None:
+        return egress_provider
+    if proxy_url is not None and str(proxy_url).strip():
+        return ProxyEgressProvider(str(proxy_url).strip())
+    if egress_configured:
+        return PinnedEgressProvider()
+    raise ValueError(
+        "pass egress_provider=, proxy_url=, or egress_configured=True "
+        "(pinned); a boolean checklist lie without a provider is rejected"
+    )
+
+
 def build_enterprise_host(
     *,
     policy_path: Path | str,
@@ -74,6 +99,7 @@ def build_enterprise_host(
     secrets_dir: Path | str | None = None,
     secrets_env_prefix: str | None = None,
     isolation_declared: bool = False,
+    egress_provider: EgressProvider | None = None,
     egress_configured: bool = False,
     proxy_url: str | None = None,
     capability_secret_name: str = "capability",
@@ -86,7 +112,8 @@ def build_enterprise_host(
     """Build a fail-closed enterprise host composition.
 
     Caller must declare OS/container isolation (``isolation_declared=True``)
-    and configure egress (``egress_configured=True`` and/or ``proxy_url``).
+    and supply egress via ``egress_provider``, ``proxy_url``, or
+    ``egress_configured=True`` (constructs ``PinnedEgressProvider``).
     Secrets come from a ``SecretProvider`` (env or file); this factory never
     embeds production HMAC material.
 
@@ -97,24 +124,24 @@ def build_enterprise_host(
         secrets_dir=secrets_dir,
         secrets_env_prefix=secrets_env_prefix,
     )
-    egress_ok = bool(egress_configured) or bool(proxy_url and str(proxy_url).strip())
     if not isolation_declared:
         raise ValueError(
             "isolation_declared must be True "
             "(host must declare OS/container isolation)"
         )
-    if not egress_ok:
-        raise ValueError(
-            "egress_configured must be True or proxy_url must be set "
-            "(pinned client or containment-egress-proxy)"
-        )
+    ep = _resolve_egress_provider(
+        egress_provider=egress_provider,
+        proxy_url=proxy_url,
+        egress_configured=egress_configured,
+    )
 
     shipper: AuditShipper = FileAuditShipper(audit_ship_destination)
     checklist = HostChecklist(
         isolation_declared=True,
         secret_provider=provider,
-        egress_configured=True,
+        egress_provider=ep,
         audit_shipper=shipper,
+        capability_secret_name=capability_secret_name,
     )
     if not checklist.ok():
         codes = ",".join(checklist.failures())
@@ -131,7 +158,7 @@ def build_enterprise_host(
 
     policy = PolicyEngine.from_yaml_path(policy_path)
     audit = AuditLog(audit_path)
-    proxy = str(proxy_url).strip() if proxy_url and str(proxy_url).strip() else None
+    proxy = ep.proxy_url
 
     broker = ToolBroker(
         policy=policy,
@@ -155,4 +182,5 @@ def build_enterprise_host(
         intent_signer=signer,
         rate_limit=rate_limit,
         proxy_url=proxy,
+        egress_provider=ep,
     )

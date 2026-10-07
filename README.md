@@ -23,7 +23,7 @@ See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) and [docs/ARCHITECTURE.md](docs
 
 Enterprise hosts should use `build_enterprise_host()` plus
 [docs/HOST_HARDENING.md](docs/HOST_HARDENING.md): `HostChecklist` / HostGate,
-`SecretProvider`, `AuditShipper`, resolve-pin helpers, and optional
+`SecretProvider`, `EgressProvider`, `AuditShipper`, resolve-pin helpers, and optional
 `containment-egress-proxy` (resolve-pin-forward; not TLS MITM). Optional
 Ed25519 (`[crypto]`), Redis consume store (`[redis]`), and `RateLimitGate`.
 This is not a FedRAMP claim and not an OS sandbox.

@@ -263,3 +263,26 @@ FedRAMP/SOC2 claims; zero residual when host skips checklist/proxy/isolation.
 
 ### Microbench interpretation
 - Numbers measure stdlib `perf_counter` around pure CPU paths (injected DNS, checklist bools, token bucket). They are **not** end-to-end agent latency and exclude LLM round-trips and real DNS.
+
+
+---
+
+## 2026-10-07 — Bar B audit harden (EgressProvider + secret bind)
+
+### EgressProvider — **ADOPT**
+- `HostChecklist.egress_provider` required (`ProxyEgressProvider` /
+  `PinnedEgressProvider`). Bool-only `egress_configured` on the checklist removed;
+  compat property remains. `build_enterprise_host` accepts `egress_provider=`,
+  `proxy_url=`, or `egress_configured=True` (pinned).
+
+### Secret bind + audit ship — **ADOPT**
+- HostGate compares `SecretProvider` capability secret to minter via
+  `CapabilityMinter.matches_secret` (constant-time). Mismatch →
+  `host_secret_mismatch`.
+- `ship_audit` (default on under HostGate) calls `AuditShipper.ship_file` after
+  each recorded decision; ship failure fail-closed → `host_audit_ship_failed`.
+- `FileAuditShipper.export_hmac_tip` for tip HMAC export.
+
+### Accepted residuals
+- Rate limit still optional on enterprise compose.
+- `isolation_declared` honor system; opener DI; proxy-wins-over-pin.

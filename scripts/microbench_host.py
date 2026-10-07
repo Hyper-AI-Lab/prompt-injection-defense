@@ -20,6 +20,7 @@ from containment.host import (
     EnvSecretProvider,
     FileAuditShipper,
     HostChecklist,
+    PinnedEgressProvider,
     TokenBucketRateLimit,
 )
 
@@ -68,7 +69,7 @@ def _bench_checklist(n: int) -> list[float]:
     checklist = HostChecklist(
         isolation_declared=True,
         secret_provider=EnvSecretProvider(),
-        egress_configured=True,
+        egress_provider=PinnedEgressProvider(),
         audit_shipper=FileAuditShipper("/tmp/containment-microbench-audit.jsonl"),
     )
     samples: list[float] = []

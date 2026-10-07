@@ -12,6 +12,7 @@ from containment.host import (
     FileAuditShipper,
     FileSecretProvider,
     HostChecklist,
+    PinnedEgressProvider,
     SecretError,
     TokenBucketRateLimit,
 )
@@ -78,10 +79,11 @@ def test_checklist_ok() -> None:
     checklist = HostChecklist(
         isolation_declared=True,
         secret_provider=provider,
-        egress_configured=True,
+        egress_provider=PinnedEgressProvider(),
         audit_shipper=shipper,
     )
     assert checklist.ok() is True
+    assert checklist.egress_configured is True
     assert checklist.failures() == ()
 
 
@@ -89,7 +91,7 @@ def test_checklist_failures_stable_codes() -> None:
     checklist = HostChecklist(
         isolation_declared=False,
         secret_provider=None,
-        egress_configured=False,
+        egress_provider=None,
         audit_shipper=None,
     )
     assert checklist.ok() is False
@@ -148,3 +150,45 @@ def test_token_bucket_refill() -> None:
 
     time.sleep(0.01)
     assert gate.allow("t", cost=1.0) is True
+
+
+def test_export_hmac_tip(tmp_path: Path) -> None:
+    from containment.actions import PolicyDecision, ProposedAction
+    from containment.audit import AuditLog
+    from containment.labels import SecurityLabel
+
+    audit = AuditLog(tmp_path / "audit.jsonl")
+    label = SecurityLabel(
+        integrity="trusted",
+        confidentiality="public",
+        source="user",
+        task_id="t1",
+    )
+    action = ProposedAction(
+        tool="web.fetch",
+        arguments={"url": "https://example.com/"},
+        principal="alice",
+        task_id="t1",
+        reason_code="test",
+        input_labels=(label,),
+        plan_step="s1",
+    )
+    decision = PolicyDecision(effect="allow", rule_id="r", reason="ok")
+    audit.append_decision(action, decision)
+    shipper = FileAuditShipper(tmp_path / "ship.jsonl")
+    tip_key = b"tip-key-bytes-for-hmac!!!!"
+    mac = shipper.export_hmac_tip(audit.path, tip_key=tip_key)
+    assert isinstance(mac, bytes) and len(mac) == 32
+    # Deterministic
+    assert shipper.export_hmac_tip(audit.path, tip_key=tip_key) == mac
+
+
+def test_egress_provider_modes() -> None:
+    from containment.host import ProxyEgressProvider
+
+    pinned = PinnedEgressProvider()
+    assert pinned.proxy_url is None
+    assert pinned.mode == "pinned"
+    proxy = ProxyEgressProvider("http://127.0.0.1:8888")
+    assert proxy.proxy_url == "http://127.0.0.1:8888"
+    assert proxy.mode == "proxy"

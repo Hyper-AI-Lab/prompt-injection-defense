@@ -131,6 +131,55 @@ def _tunnel(a: socket.socket, b: socket.socket, timeout: float) -> None:
                 pass
 
 
+
+def _parse_connect_target(target: str) -> tuple[str, int]:
+    """Parse CONNECT authority into (host, port).
+
+    Bracketed IPv6 (``[::1]`` or ``[::1]:443``) is accepted; missing port
+    defaults to 443. Unbracketed multi-colon IPv6 is rejected (fail closed).
+    """
+    host_port = target.strip()
+    if not host_port:
+        raise ValueError("empty CONNECT host")
+    if host_port.startswith("["):
+        end = host_port.find("]")
+        if end < 0:
+            raise ValueError("unclosed IPv6 bracket")
+        host = host_port[1:end]
+        if not host:
+            raise ValueError("empty CONNECT host")
+        rest = host_port[end + 1 :]
+        if rest == "":
+            return host, 443
+        if not rest.startswith(":"):
+            raise ValueError("bad CONNECT authority after IPv6")
+        port_s = rest[1:]
+        if not port_s:
+            raise ValueError("bad CONNECT port")
+        try:
+            port = int(port_s)
+        except ValueError as exc:
+            raise ValueError("bad CONNECT port") from exc
+        if port < 1 or port > 65535:
+            raise ValueError("bad CONNECT port")
+        return host, port
+    # hostname or IPv4 — at most one colon for :port
+    if host_port.count(":") > 1:
+        raise ValueError("unbracketed IPv6 CONNECT authority")
+    if ":" in host_port:
+        host, _, port_s = host_port.rpartition(":")
+        if not host:
+            raise ValueError("empty CONNECT host")
+        try:
+            port = int(port_s)
+        except ValueError as exc:
+            raise ValueError("bad CONNECT port") from exc
+        if port < 1 or port > 65535:
+            raise ValueError("bad CONNECT port")
+        return host, port
+    return host_port, 443
+
+
 class EgressProxyServer:
     """Resolve-pin-forward HTTP proxy (stdlib sockets)."""
 
@@ -272,22 +321,18 @@ class EgressProxyServer:
             _reply(client, 405, "CONNECT disabled")
             client.close()
             return
-        host_port = target.strip()
-        if ":" in host_port:
-            host, _, port_s = host_port.rpartition(":")
-            try:
-                port = int(port_s)
-            except ValueError:
-                _reply(client, 400, "bad CONNECT port")
-                client.close()
-                return
-        else:
-            host, port = host_port, 443
-        if not host:
-            _reply(client, 400, "empty CONNECT host")
+        try:
+            host, port = _parse_connect_target(target)
+        except ValueError as exc:
+            _reply(client, 400, str(exc))
             client.close()
             return
-        url = f"https://{host}:{port}/"
+        # Bracket IPv6 in the URL authority so urlparse stays unambiguous.
+        if ":" in host:
+            authority = f"[{host}]:{port}"
+        else:
+            authority = f"{host}:{port}"
+        url = f"https://{authority}/"
         try:
             pin = self._pin(url, schemes=frozenset({"https"}))
             upstream = self._connect_pin(pin)

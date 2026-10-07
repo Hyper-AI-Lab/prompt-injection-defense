@@ -26,10 +26,13 @@ from containment.egress_resolve import (
 from containment.enterprise import EnterpriseHost, build_enterprise_host
 from containment.host import (
     AuditShipper,
+    EgressProvider,
     EnvSecretProvider,
     FileAuditShipper,
     FileSecretProvider,
     HostChecklist,
+    PinnedEgressProvider,
+    ProxyEgressProvider,
     RateLimitGate,
     SecretError,
     SecretProvider,
@@ -64,7 +67,7 @@ from containment.url_guard import (
     parse_egress_url,
 )
 
-__version__ = "1.3.0"
+__version__ = "1.3.1"
 
 __all__ = [
     "ALLOWLIST_SUMMARY_SCHEMA",
@@ -84,6 +87,9 @@ __all__ = [
     "DetectorCascade",
     "EgressProxyServer",
     "EnterpriseHost",
+    "EgressProvider",
+    "PinnedEgressProvider",
+    "ProxyEgressProvider",
     "EnvSecretProvider",
     "ExtractResult",
     "FileAuditShipper",

@@ -11,7 +11,12 @@ from containment.actions import ProposedAction
 from containment.audit import AuditLog
 from containment.broker import SecurityViolation, ToolBroker
 from containment.capability import CapabilityMinter
-from containment.host import FileAuditShipper, FileSecretProvider, HostChecklist
+from containment.host import (
+    FileAuditShipper,
+    FileSecretProvider,
+    HostChecklist,
+    PinnedEgressProvider,
+)
 from containment.intent import (
     Ed25519IntentSigner,
     IntentError,
@@ -153,11 +158,11 @@ def test_broker_ed25519_allow(tmp_path: Path) -> None:
     signed = signer.sign(_envelope(), plan=plan, ttl_seconds=3600.0)
     secrets_root = tmp_path / "secrets"
     secrets_root.mkdir()
-    (secrets_root / "hmac").write_bytes(b"host-gate-secret-bytes")
+    (secrets_root / "capability").write_bytes(b"x" * 32)
     checklist = HostChecklist(
         isolation_declared=True,
         secret_provider=FileSecretProvider(secrets_root),
-        egress_configured=True,
+        egress_provider=PinnedEgressProvider(),
         audit_shipper=FileAuditShipper(tmp_path / "shipped-audit.jsonl"),
     )
     # Verify-only public key on the broker

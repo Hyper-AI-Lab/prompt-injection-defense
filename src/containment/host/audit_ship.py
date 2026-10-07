@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
+import json
 import threading
 from pathlib import Path
 from typing import Protocol, runtime_checkable
@@ -40,3 +43,48 @@ class FileAuditShipper:
             with self._destination.open("a", encoding="utf-8") as fh:
                 for ln in lines:
                     fh.write(ln + "\n")
+
+    def export_hmac_tip(
+        self,
+        audit_path: Path | str,
+        *,
+        tip_key: bytes | None = None,
+        tip_key_path: Path | str | None = None,
+    ) -> bytes:
+        """HMAC-SHA256 over the last ``event_hash`` tip in ``audit_path``.
+
+        Provide ``tip_key`` bytes or ``tip_key_path`` (file contents, trailing
+        CR/LF stripped). Empty audit or missing tip raises ``ValueError``.
+        """
+        if tip_key is None and tip_key_path is None:
+            raise ValueError("provide tip_key or tip_key_path")
+        if tip_key is not None and tip_key_path is not None:
+            raise ValueError("pass only one of tip_key, tip_key_path")
+        if tip_key is None:
+            assert tip_key_path is not None
+            key = Path(tip_key_path).read_bytes().rstrip(b"\r\n")
+        else:
+            key = tip_key
+        if not key:
+            raise ValueError("tip key must be non-empty")
+        tip = _last_event_hash(Path(audit_path))
+        if tip is None:
+            raise ValueError("audit file has no event_hash tip")
+        return hmac.new(key, tip.encode("ascii"), hashlib.sha256).digest()
+
+
+def _last_event_hash(path: Path) -> str | None:
+    if not path.is_file():
+        return None
+    last: str | None = None
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            raw = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        tip = raw.get("event_hash")
+        if isinstance(tip, str) and tip:
+            last = tip
+    return last

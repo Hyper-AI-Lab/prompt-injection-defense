@@ -1504,3 +1504,100 @@ Limiter: CPU / Python call overhead (stdlib clock); not network or model latency
 - Microbench (n=2000): resolve_and_pin mean 0.0163 ms; HostChecklist.ok 0.0001 ms; TokenBucket 0.0006 ms
 
 ### Verdict: VERIFIED (Bar B complete on origin/main)
+
+## Bar B Audit — Plan locked + Step 1 Baseline — 2026-10-07 22:28 JST
+
+### Scope
+K requested poteto-mode confirmation that 1.3.0 matches LEFTOVERS plan + leftovers vision, plus full integrity audit and harden. Law: `BAR_B_AUDIT_HARDEN_PLAN.md`.
+
+### Baseline
+- HEAD: `bf14a69`
+- version: 1.3.0
+- release_gate: OK
+- pytest: 251 passed, 2 skipped
+- eval: ASR=0.0000 FPR=0.0278 utility=0.9722
+
+### Verdict: VERIFIED (step 1); begin step 2 swarm
+
+## Bar B Audit — Step 2 Swarm + Step 3 Plan-match — 2026-10-07 22:31 JST
+
+### Evidence
+- swarm-reports/bar-b-audit/slice-{A,B,C,D}-*.md + SWARM_AGGREGATE.md
+- AUDIT_PLAN_VS_BAR_B.md written
+
+### Verdict: VERIFIED (steps 2–3); begin step 4 Fix GAP cluster H
+
+## Bar B Audit — Step 4 Fix GAP cluster H — 2026-10-07 22:35 JST
+
+### Changes
+- Added `containment.host.egress.EgressProvider` Protocol + `ProxyEgressProvider` /
+  `PinnedEgressProvider`.
+- `HostChecklist` now requires `egress_provider`; `egress_configured` is a read-only
+  compat property. Scaffold "later steps" docstring removed.
+- `capability_secret_name` on checklist (default `capability`).
+- `CapabilityMinter.matches_secret` (constant-time).
+- Broker HostGate: secret bind → deny `host_secret_mismatch`; `ship_audit` (default
+  on under HostGate) ships after each `_record_decision`; ship failure →
+  `host_audit_ship_failed`.
+- `FileAuditShipper.export_hmac_tip`.
+- `build_enterprise_host`: `egress_provider=` / `proxy_url=` / `egress_configured=True`
+  (pinned); rejects missing egress.
+
+### Verify
+- Unit tests for checklist, secret mismatch, audit ship, enterprise egress provider.
+
+### Verdict: VERIFIED
+
+## Bar B Audit — Step 5 Fix GAP cluster E — 2026-10-07 22:35 JST
+
+### Changes
+- `docs/HOST_HARDENING.md` CLI: `--listen HOST:PORT` (matches `egress_proxy.main`).
+- `_parse_connect_target`: bracketed IPv6 with default port 443; unbracketed
+  multi-colon IPv6 fail-closed; CONNECT URL brackets IPv6 authority.
+- Tests: parse unit + `[::1]` CONNECT deny.
+
+### Verdict: VERIFIED
+
+## Bar B Audit — Step 6 Fix GAP cluster D — 2026-10-07 22:35 JST
+
+### Changes
+- THREAT_MODEL: HostGate + EgressProvider + secret bind; accepted residuals
+  (rate optional, isolation honor system, opener DI, proxy-wins).
+- DECISIONS: Bar B audit harden adopt note.
+- AGENT_INSTALL / HOST_HARDENING / SKILL / README: checklist API + EgressProvider.
+- README tone: EgressProvider named in Bar B blurb.
+
+### Verdict: VERIFIED
+
+## Bar B Audit — Step 7 Integrity + regression — 2026-10-07 22:35 JST
+
+### Changes
+- `scripts/release_gate.sh`: case-insensitive TODO/FIXME; case-sensitive
+  NotImplemented/placeholder/TBD; fail on `secret=b"` in docs/README/SKILL;
+  fail on `later steps` in src/.
+
+### Prove-it
+- ruff: clean
+- pytest: **259 passed, 2 skipped**
+- eval: ASR=0.0000 FPR=0.0278 utility=0.9722
+- `./scripts/release_gate.sh`: OK
+- Version remains **1.3.0** (step 8 not in this change set; no bump / no push)
+
+### Accepted residuals (unchanged)
+- Rate limit optional under enterprise
+- isolation_declared honor system
+- opener DI / proxy-wins-over-pin
+
+### Verdict: VERIFIED (steps 4–7 complete; step 8 deferred per parent)
+
+## Bar B Audit — Step 8 Final prove-it — 2026-10-07 22:36 JST
+
+### Scope
+Behavior fixes from audit steps 4–7 → version **1.3.1**. release_gate OK. Push origin/main.
+
+### Metrics
+- pytest: 259 passed, 2 skipped
+- eval: ASR=0.0000 FPR=0.0278 utility=0.9722
+- release_gate: OK
+
+### Verdict: VERIFIED (pre-push)

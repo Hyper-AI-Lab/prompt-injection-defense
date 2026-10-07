@@ -7,7 +7,13 @@ from pathlib import Path
 import pytest
 
 from containment.enterprise import EnterpriseHost, build_enterprise_host
-from containment.host import FileAuditShipper, FileSecretProvider, TokenBucketRateLimit
+from containment.host import (
+    FileAuditShipper,
+    FileSecretProvider,
+    PinnedEgressProvider,
+    ProxyEgressProvider,
+    TokenBucketRateLimit,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 POLICY_PATH = ROOT / "policies" / "default_deny.yaml"
@@ -43,6 +49,9 @@ def test_build_enterprise_host_checklist_and_gate(tmp_path: Path) -> None:
     assert isinstance(host.shipper, FileAuditShipper)
     assert host.proxy_url is None
     assert host.rate_limit is None
+    assert isinstance(host.egress_provider, PinnedEgressProvider)
+    assert host.checklist.egress_provider is host.egress_provider
+    assert host.checklist.egress_configured is True
 
 
 def test_proxy_url_sets_egress_and_hint(tmp_path: Path) -> None:
@@ -58,6 +67,7 @@ def test_proxy_url_sets_egress_and_hint(tmp_path: Path) -> None:
     )
     assert host.checklist.ok()
     assert host.proxy_url == "http://127.0.0.1:8888"
+    assert isinstance(host.egress_provider, ProxyEgressProvider)
 
 
 def test_rate_limit_wired(tmp_path: Path) -> None:
@@ -126,3 +136,19 @@ def test_rejects_multiple_secret_backends(tmp_path: Path) -> None:
             isolation_declared=True,
             egress_configured=True,
         )
+
+
+
+def test_explicit_egress_provider(tmp_path: Path) -> None:
+    secrets = _secrets(tmp_path)
+    ep = ProxyEgressProvider("http://127.0.0.1:9999")
+    host = build_enterprise_host(
+        policy_path=POLICY_PATH,
+        audit_path=tmp_path / "a.jsonl",
+        audit_ship_destination=tmp_path / "s.jsonl",
+        secrets_dir=secrets,
+        isolation_declared=True,
+        egress_provider=ep,
+    )
+    assert host.egress_provider is ep
+    assert host.proxy_url == "http://127.0.0.1:9999"

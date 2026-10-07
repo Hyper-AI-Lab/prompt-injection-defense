@@ -259,3 +259,43 @@ def test_cli_help_exits_zero() -> None:
 
 def test_cli_main_importable() -> None:
     assert callable(main)
+
+
+def test_parse_connect_target_ipv6_default_port() -> None:
+    from containment.egress_proxy import _parse_connect_target
+
+    host, port = _parse_connect_target("[::1]")
+    assert host == "::1"
+    assert port == 443
+    host2, port2 = _parse_connect_target("[2001:db8::1]:8443")
+    assert host2 == "2001:db8::1"
+    assert port2 == 8443
+
+
+def test_parse_connect_target_rejects_unbracketed_ipv6() -> None:
+    from containment.egress_proxy import _parse_connect_target
+
+    with pytest.raises(ValueError, match="unbracketed"):
+        _parse_connect_target("::1")
+    with pytest.raises(ValueError, match="unbracketed"):
+        _parse_connect_target("2001:db8::1:443")
+
+
+def test_connect_bracketed_ipv6_loopback_denied() -> None:
+    """Bracketed IPv6 without port defaults to 443; loopback still denied."""
+    proxy = EgressProxyServer(
+        ProxyConfig(listen_host="127.0.0.1", listen_port=0),
+    )
+    proxy.serve_in_thread()
+    try:
+        req = (
+            b"CONNECT [::1] HTTP/1.1\r\n"
+            b"Host: [::1]\r\n"
+            b"\r\n"
+        )
+        resp = _proxy_http_request("127.0.0.1", proxy.listen_port, req)
+        assert resp.startswith(b"HTTP/1.1 403")
+        body = resp.lower()
+        assert b"denied" in body or b"loopback" in body
+    finally:
+        proxy.shutdown()

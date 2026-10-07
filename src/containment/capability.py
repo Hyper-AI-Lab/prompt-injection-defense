@@ -69,6 +69,12 @@ class CapabilityMinter:
             mac=mac,
         )
 
+    def matches_secret(self, other: bytes) -> bool:
+        """Constant-time compare of ``other`` to the minter HMAC secret."""
+        if not isinstance(other, (bytes, bytearray)):
+            return False
+        return hmac.compare_digest(bytes(other), self._secret)
+
     def verify(
         self,
         token: CapabilityToken,
