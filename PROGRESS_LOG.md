@@ -878,3 +878,11 @@ ON vs OFF differs on ASR and policy_block_rate; detector_block_rate identical (s
 
 ### Verdict: VERIFIED (pre-push)
 Push to `origin/main` follows; remote HEAD confirmation appended after push.
+
+### Post-push VERIFIED — 2026-10-07 16:20 JST
+- **Pushed:** `main` → `origin` (`https://github.com/Hyper-AI-Lab/prompt-injection-defense.git`)
+- **Remote HEAD:** `3372fcebe81fdb155db85aff6b569e1118db9f15` (`Release containment 1.1.0 (audit harden)`)
+- **Range published:** `a1cead1..3372fce` (includes harden `ba9d916`, `3b9671a`, release `3372fce`)
+- **Local == origin/main:** yes
+
+### Verdict: VERIFIED
