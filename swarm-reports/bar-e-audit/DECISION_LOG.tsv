@@ -8,3 +8,4 @@ ts	phase	decision	why	evidence	result
 2026-10-08T01:29:50+09:00	fix-X	ARCHITECTURE+README name eval_card; docs scrub	X1/X2 + E1 wording	DECISIONS append 1.6.1	VERIFIED
 2026-10-08T01:30:08+09:00	integrity	E1 repro FAIL gate; 12 tests; ruff clean	step 6 lock findings	aggregate+AUDIT cleared	VERIFIED
 2026-10-08T01:30:47+09:00	prove-it	bump 1.6.1; gate 305 passed; card PASS	E1 behavior change requires bump	ASR 0.0000 unchanged	VERIFIED-pre-push
+2026-10-08T01:30:56+09:00	push	pushed 93e0bf6 to origin/main	law step 7 complete	1.6.1 live; 305 passed; ASR 0.0000	VERIFIED

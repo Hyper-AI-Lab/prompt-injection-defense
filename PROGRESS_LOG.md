@@ -2395,3 +2395,21 @@ Law step 7. Behavior fix landed → bump **1.6.1**; release_gate; card smoke; co
 - Prior Bar C+D residuals unchanged
 
 ### Verdict: VERIFIED (pre-push; push next)
+
+## Bar E Audit — Step 7 Final prove-it (post-push) — 2026-10-08 JST
+
+### Scope
+Confirm `origin/main` carries **containment 1.6.1** after Bar E audit harden.
+
+### Evidence
+- Release commit: `93e0bf6` — *Release containment 1.6.1 — Bar E audit harden*
+- Push: `d025cf2..93e0bf6  main -> main` (Hyper-AI-Lab/prompt-injection-defense)
+- Version: pyproject + `__version__` = **1.6.1**
+- Gate (pre-push): release_gate OK; **305 passed**, 2 skipped; **ASR 0.0000**; card gate=PASS
+- Plan-match: done-predicate 1–5 PASS post-harden; E1/X1/X2 cleared; residuals accepted
+- Paths: `AUDIT_PLAN_VS_BAR_E.md`, `swarm-reports/bar-e-audit/SWARM_AGGREGATE.md`
+
+### Done predicate (audit law)
+Matrix written; swarm aggregated; integrity surfaces clean; release_gate OK; **1.6.1** on origin/main.
+
+### Verdict: VERIFIED
