@@ -2,21 +2,21 @@
 
 from __future__ import annotations
 
-import ipaddress
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
-from urllib.parse import urlparse
 
 from containment.actions import PolicyDecision, ProposedAction
 from containment.audit import AuditLog
 from containment.capability import CapabilityMinter, CapabilityToken
 from containment.detectors.base import CascadeResult
 from containment.detectors.cascade import PRIVILEGED_SINKS, privileged_sink_fail_closed
+from containment.intent import IntentError, IntentSigner, SignedIntent
 from containment.plan import Plan
 from containment.policy import PolicyEngine
 from containment.tool_schemas import registry_schema_validator
+from containment.url_guard import UrlGuardError, check_public_only, check_redirect_args
 
 # Privileged / no-tainted-egress tools must carry non-empty input_labels (H1).
 _LABEL_REQUIRED_SINKS: frozenset[str] = PRIVILEGED_SINKS | frozenset({"social.publish"})
@@ -98,6 +98,9 @@ class ToolBroker:
         approval: ApprovalHook = default_approval_hook,
         executor: Executor | None = None,
         known_tools: frozenset[str] | None = None,
+        require_signed_intent: bool = False,
+        intent_signer: IntentSigner | None = None,
+        enterprise_profile: bool = False,
     ) -> None:
         self.policy = policy
         self.audit = audit
@@ -106,6 +109,9 @@ class ToolBroker:
         self.approval = approval
         self.executor = executor
         self.known_tools = known_tools
+        self.require_signed_intent = bool(require_signed_intent or enterprise_profile)
+        self.intent_signer = intent_signer
+        self.enterprise_profile = bool(enterprise_profile)
 
     def secure_execute(
         self,
@@ -116,7 +122,38 @@ class ToolBroker:
         expiry_seconds: float = 60.0,
         cascade: CascadeResult | None = None,
         fail_closed_privileged: bool = False,
+        intent: SignedIntent | None = None,
     ) -> BrokerResult:
+        # 0) Signed intent gate (enterprise / require_signed_intent).
+        if self.require_signed_intent:
+            if intent is None:
+                decision = PolicyDecision(
+                    effect="deny",
+                    rule_id="signed_intent_required",
+                    reason="signed intent required but not provided",
+                )
+                self.audit.append_decision(action, decision)
+                raise SecurityViolation(decision.reason, decision=decision)
+            if self.intent_signer is None:
+                decision = PolicyDecision(
+                    effect="deny",
+                    rule_id="signed_intent_required",
+                    reason="intent_signer not configured",
+                )
+                self.audit.append_decision(action, decision)
+                raise SecurityViolation(decision.reason, decision=decision)
+            try:
+                env = self.intent_signer.verify(intent, plan=plan)
+            except IntentError as exc:
+                decision = PolicyDecision(
+                    effect="deny",
+                    rule_id="signed_intent_invalid",
+                    reason=str(exc),
+                )
+                self.audit.append_decision(action, decision)
+                raise SecurityViolation(decision.reason, decision=decision) from exc
+            principal_authenticated = env.principal_authenticated
+
         # 1) Optional known-tool gate (deny unknown before policy noise).
         if self.known_tools is not None and action.tool not in self.known_tools:
             decision = PolicyDecision(
@@ -294,19 +331,10 @@ def _limits_violation(action: ProposedAction, limits: Mapping[str, Any]) -> str 
                 return f"argument {key!r} exceeds max_bytes {max_b}"
 
     if "redirects" in limits:
-        limit_r = int(limits["redirects"])
-        if limit_r < 0:
-            return "redirects must be >= 0"
-        for key in ("redirects", "max_redirects"):
-            if key in action.arguments:
-                raw = action.arguments[key]
-                if isinstance(raw, (int, float)) and int(raw) > limit_r:
-                    return f"argument {key!r} exceeds policy redirects {limit_r}"
-        if "allow_redirects" in action.arguments and bool(
-            action.arguments["allow_redirects"]
-        ):
-            if limit_r <= 0:
-                return "allow_redirects true violates redirects <= 0"
+        try:
+            check_redirect_args(action.arguments, max_redirects=int(limits["redirects"]))
+        except UrlGuardError as exc:
+            return str(exc)
 
     if "network" in limits:
         network = limits["network"]
@@ -314,38 +342,12 @@ def _limits_violation(action: ProposedAction, limits: Mapping[str, Any]) -> str 
             return f"unsupported network limit {network!r}"
         url = action.arguments.get("url")
         if isinstance(url, str) and url.strip():
-            if _url_host_not_public(url):
-                return "network public_only: URL host is not a public address"
+            try:
+                check_public_only(url)
+            except UrlGuardError as exc:
+                return str(exc)
 
     return None
-
-
-def _url_host_not_public(url: str) -> bool:
-    """True when URL host is loopback, private, link-local, or unspecified.
-
-    Hostname resolution is not performed (no network stack); literal IPs and
-    well-known local hostnames are classified from the URL string only.
-    """
-    host = urlparse(url).hostname
-    if host is None or not host.strip():
-        return True
-    lowered = host.lower().rstrip(".")
-    if lowered in {"localhost", "localhost.localdomain"}:
-        return True
-    try:
-        ip = ipaddress.ip_address(lowered)
-    except ValueError:
-        # Non-literal hostname: cannot prove private without DNS — allow
-        # host allowlist predicates to govern names; only literal IPs blocked here.
-        return False
-    return bool(
-        ip.is_private
-        or ip.is_loopback
-        or ip.is_link_local
-        or ip.is_unspecified
-        or ip.is_multicast
-        or ip.is_reserved
-    )
 
 
 def _resource_hints(action: ProposedAction) -> tuple[str, ...]:

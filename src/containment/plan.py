@@ -7,11 +7,9 @@ from dataclasses import dataclass, field
 
 @dataclass(frozen=True, slots=True)
 class IntentEnvelope:
-    """Signed-style task identity and scope (fields only in 1.x; no crypto binding).
+    """Task identity and scope fields.
 
-    Captures who asked for what, under which tenant and risk budget, before
-    any untrusted content is read. Cryptographic intent signing remains out of
-    scope for 1.x — see AUDIT non-goals / DECISIONS.
+    HMAC binding lives in ``containment.intent.SignedIntent`` / ``IntentSigner``.
     """
 
     task_id: str

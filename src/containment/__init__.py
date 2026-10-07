@@ -4,10 +4,16 @@ from containment.actions import PolicyDecision, ProposedAction, TraceEvent
 from containment.audit import AuditLog
 from containment.broker import BrokerResult, SecurityViolation, ToolBroker
 from containment.capability import CapabilityError, CapabilityMinter, CapabilityToken
+from containment.capability_store import (
+    CapabilityConsumeStore,
+    MemoryConsumeStore,
+    SqliteConsumeStore,
+)
 from containment.datamark import DatamarkedText, mark, unwrap
 from containment.detectors.cascade import DetectorCascade
 from containment.detectors.piguard import select_stage1
 from containment.ingest import IngestResult, ingest
+from containment.intent import IntentError, IntentSigner, SignedIntent, plan_hash
 from containment.labels import SecurityLabel
 from containment.moltbook import MOLTBOOK_SUMMARY_SCHEMA, MoltbookError, read_posts
 from containment.plan import IntentEnvelope, Plan, PlanStep
@@ -19,6 +25,12 @@ from containment.quarantine import (
     closed_object_schema,
     extract,
 )
+from containment.url_guard import (
+    ParsedEgressUrl,
+    UrlGuardError,
+    check_url_for_tool,
+    parse_egress_url,
+)
 
 __version__ = "1.1.0"
 
@@ -29,11 +41,17 @@ __all__ = [
     "CapabilityError",
     "CapabilityMinter",
     "CapabilityToken",
+    "CapabilityConsumeStore",
+    "MemoryConsumeStore",
+    "SqliteConsumeStore",
     "DatamarkedText",
     "DetectorCascade",
     "ExtractResult",
     "IngestResult",
     "IntentEnvelope",
+    "IntentError",
+    "IntentSigner",
+    "SignedIntent",
     "MOLTBOOK_SUMMARY_SCHEMA",
     "MoltbookError",
     "Plan",
@@ -47,11 +65,16 @@ __all__ = [
     "SecurityViolation",
     "ToolBroker",
     "TraceEvent",
+    "ParsedEgressUrl",
+    "UrlGuardError",
     "__version__",
     "closed_object_schema",
     "extract",
     "ingest",
     "mark",
+    "check_url_for_tool",
+    "parse_egress_url",
+    "plan_hash",
     "read_posts",
     "select_stage1",
     "unwrap",

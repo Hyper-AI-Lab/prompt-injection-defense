@@ -14,14 +14,16 @@ import urllib.request
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
-from urllib.request import Request
+from urllib.request import HTTPErrorProcessor, HTTPRedirectHandler, Request
 
 from containment.detectors.cascade import DetectorCascade
 from containment.ingest import IngestResult, default_ingest_cascade, ingest
 from containment.quarantine import closed_object_schema
+from containment.url_guard import UrlGuardError, check_url_for_tool, parse_egress_url
 
 DEFAULT_API_BASE = "https://www.moltbook.com/api/v1"
 LIVE_ENV = "CONTAINMENT_LIVE_MOLTBOOK"
+DEFAULT_MAX_BYTES = 2_000_000
 
 MOLTBOOK_SUMMARY_SCHEMA: dict[str, Any] = closed_object_schema(
     {
@@ -32,6 +34,21 @@ MOLTBOOK_SUMMARY_SCHEMA: dict[str, Any] = closed_object_schema(
     required=["title", "topic", "summary"],
     schema_id="moltbook_summary",
 )
+
+_DEFAULT_HOST = parse_egress_url(DEFAULT_API_BASE).host
+
+
+class MoltbookError(RuntimeError):
+    """Raised when the public API request or parse fails."""
+
+
+class _NoRedirectHandler(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[no-untyped-def]
+        raise MoltbookError(f"HTTP redirect forbidden ({code} → {newurl})")
+
+
+def _default_opener():
+    return urllib.request.build_opener(_NoRedirectHandler, HTTPErrorProcessor)
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,10 +67,6 @@ class MoltbookPostSummary:
         if self.ingest.extract is None:
             return None
         return self.ingest.extract.data
-
-
-class MoltbookError(RuntimeError):
-    """Raised when the public API request or parse fails."""
 
 
 def _truncate(text: str, max_len: int) -> str:
@@ -77,6 +90,18 @@ def candidate_from_post(post: Mapping[str, Any]) -> dict[str, str]:
     }
 
 
+def _validate_base_url(base_url: str) -> None:
+    try:
+        check_url_for_tool(
+            base_url if "://" in base_url else f"{base_url}/",
+            schemes=frozenset({"https"}),
+            host_allowlist={_DEFAULT_HOST},
+            network="public_only",
+        )
+    except UrlGuardError as exc:
+        raise MoltbookError(f"unsafe base_url: {exc.reason}") from exc
+
+
 def fetch_posts(
     *,
     sort: str = "new",
@@ -84,19 +109,34 @@ def fetch_posts(
     base_url: str = DEFAULT_API_BASE,
     timeout: float = 20.0,
     opener: Any = None,
+    max_bytes: int = DEFAULT_MAX_BYTES,
 ) -> list[dict[str, Any]]:
     """GET public ``/posts`` with sort/limit. No auth headers.
 
     ``opener`` is an optional callable ``(Request, timeout=...) -> http response``
-    for dependency injection / tests. Defaults to ``urllib.request.urlopen``.
+    for dependency injection / tests. Defaults to a no-redirect urllib opener.
     """
     if limit < 1 or limit > 100:
         raise ValueError("limit must be in 1..100")
     if not sort or not str(sort).strip():
         raise ValueError("sort must be a non-empty string")
+    if max_bytes < 1:
+        raise ValueError("max_bytes must be >= 1")
+
+    _validate_base_url(base_url.rstrip("/") + "/")
 
     query = urllib.parse.urlencode({"sort": sort, "limit": str(limit)})
     url = f"{base_url.rstrip('/')}/posts?{query}"
+    try:
+        check_url_for_tool(
+            url,
+            schemes=frozenset({"https"}),
+            host_allowlist={_DEFAULT_HOST},
+            network="public_only",
+        )
+    except UrlGuardError as exc:
+        raise MoltbookError(f"unsafe fetch url: {exc.reason}") from exc
+
     req = Request(
         url,
         headers={
@@ -105,15 +145,23 @@ def fetch_posts(
         },
         method="GET",
     )
-    open_fn = opener or urllib.request.urlopen
+    if opener is None:
+        open_fn = _default_opener().open
+    else:
+        open_fn = opener
     try:
         with open_fn(req, timeout=timeout) as resp:
             status = getattr(resp, "status", None) or resp.getcode()
-            body = resp.read()
+            body = resp.read(max_bytes + 1)
+    except MoltbookError:
+        raise
     except urllib.error.HTTPError as exc:
         raise MoltbookError(f"HTTP {exc.code} fetching {url}") from exc
     except urllib.error.URLError as exc:
         raise MoltbookError(f"network error fetching {url}: {exc.reason}") from exc
+
+    if len(body) > max_bytes:
+        raise MoltbookError(f"response exceeds max_bytes {max_bytes}")
 
     if status and int(status) >= 400:
         raise MoltbookError(f"HTTP {status} fetching {url}")
@@ -158,7 +206,6 @@ def ingest_post(
         integrity="untrusted",
         confidentiality="public",
         cascade=cascade or default_ingest_cascade(),
-        # Summary allows free strings up to maxLength; still reject injections.
         reject_instruction_text=True,
     )
     return MoltbookPostSummary(post_id=post_id, ingest=result)
@@ -173,6 +220,7 @@ def read_posts(
     base_url: str = DEFAULT_API_BASE,
     timeout: float = 20.0,
     opener: Any = None,
+    max_bytes: int = DEFAULT_MAX_BYTES,
 ) -> list[MoltbookPostSummary]:
     """Fetch public posts and run each through containment ingest."""
     posts = fetch_posts(
@@ -181,6 +229,7 @@ def read_posts(
         base_url=base_url,
         timeout=timeout,
         opener=opener,
+        max_bytes=max_bytes,
     )
     return [
         ingest_post(p, task_id=task_id, cascade=cascade) for p in posts
@@ -194,6 +243,7 @@ def live_enabled() -> bool:
 
 __all__ = [
     "DEFAULT_API_BASE",
+    "DEFAULT_MAX_BYTES",
     "LIVE_ENV",
     "MOLTBOOK_SUMMARY_SCHEMA",
     "MoltbookError",

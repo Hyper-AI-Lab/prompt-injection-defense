@@ -29,8 +29,8 @@ def _fake_response(payload: dict[str, Any], *, status: int = 200) -> Any:
             self.status = status
             self._buf = io.BytesIO(body)
 
-        def read(self) -> bytes:
-            return self._buf.read()
+        def read(self, n: int = -1) -> bytes:
+            return self._buf.read() if n < 0 else self._buf.read(n)
 
         def getcode(self) -> int:
             return self.status
@@ -111,7 +111,7 @@ def test_fetch_invalid_json_raises() -> None:
     class Bad:
         status = 200
 
-        def read(self) -> bytes:
+        def read(self, n: int = -1) -> bytes:
             return b"not-json"
 
         def getcode(self) -> int:
@@ -152,3 +152,49 @@ def test_live_env_default_off(monkeypatch: pytest.MonkeyPatch) -> None:
     assert live_enabled() is False
     monkeypatch.setenv(LIVE_ENV, "1")
     assert live_enabled() is True
+
+
+def test_fetch_rejects_metadata_base_url() -> None:
+    with pytest.raises(MoltbookError, match="unsafe base_url"):
+        fetch_posts(base_url="https://169.254.169.254/", opener=lambda *a, **k: None)
+
+
+def test_fetch_rejects_http_base_url() -> None:
+    with pytest.raises(MoltbookError, match="unsafe base_url"):
+        fetch_posts(base_url="http://www.moltbook.com/api/v1", opener=lambda *a, **k: None)
+
+
+def test_fetch_rejects_wrong_host_base_url() -> None:
+    with pytest.raises(MoltbookError, match="unsafe base_url"):
+        fetch_posts(base_url="https://evil.example/api/v1", opener=lambda *a, **k: None)
+
+
+def test_fetch_max_bytes_enforced() -> None:
+    class Resp:
+        status = 200
+
+        def read(self, n: int = -1) -> bytes:
+            # Return more than max_bytes when asked for max+1
+            return b"x" * n
+
+        def getcode(self) -> int:
+            return 200
+
+        def __enter__(self) -> Resp:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+    def opener(req: Request, timeout: float = 20.0) -> Any:
+        return Resp()
+
+    with pytest.raises(MoltbookError, match="max_bytes"):
+        fetch_posts(opener=opener, max_bytes=50)
+
+
+def test_default_opener_is_no_redirect() -> None:
+    from containment.moltbook import _default_opener, _NoRedirectHandler
+
+    opener = _default_opener()
+    assert any(isinstance(h, _NoRedirectHandler) for h in opener.handlers)

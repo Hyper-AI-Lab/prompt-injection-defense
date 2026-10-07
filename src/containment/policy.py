@@ -6,12 +6,12 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
 
 import yaml
 
 from containment.actions import PolicyDecision, ProposedAction
 from containment.plan import Plan
+from containment.url_guard import UrlGuardError, host_in_allowlist, parse_egress_url
 
 _CONF_RANK = {"public": 0, "private": 1, "identity": 2}
 _EFFECT_MAP = {
@@ -221,17 +221,26 @@ def _predicate(
         url = action.arguments.get("url")
         if not isinstance(url, str):
             return False
-        return urlparse(url).scheme == str(expected)
+        try:
+            parsed = parse_egress_url(
+                url, allowed_schemes=frozenset({str(expected), "http", "https"})
+            )
+        except UrlGuardError:
+            return False
+        return parsed.scheme == str(expected)
 
     if key == "args.url.host_in":
         url = action.arguments.get("url")
         if not isinstance(url, str):
             return False
-        host = urlparse(url).hostname
-        if host is None:
+        try:
+            parsed = parse_egress_url(
+                url, allowed_schemes=frozenset({"http", "https"})
+            )
+        except UrlGuardError:
             return False
         allowlist = _named_set(str(expected), plan)
-        return host in allowlist
+        return host_in_allowlist(parsed.host, allowlist)
 
     if key == "args.recipient_in":
         recipient = action.arguments.get("recipient")

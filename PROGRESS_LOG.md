@@ -886,3 +886,128 @@ Push to `origin/main` follows; remote HEAD confirmation appended after push.
 - **Local == origin/main:** yes
 
 ### Verdict: VERIFIED
+
+
+## 2026-10-07 — Enterprise Bar A harden started (poteto + swarm)
+
+Bar A approved. Swarm aggregate: `swarm-reports/SWARM_AGGREGATE.md` (6/6 ISSUES). Plan: `ENTERPRISE_HARDEN_PLAN.md` (11 steps → 1.2.0).
+
+
+## Enterprise Bar A — Step 1 Baseline — 2026-10-07 16:44 JST
+
+### Scope
+Record gate + pytest + eval metrics; no code changes. SHA `765a618` (`containment==1.1.0`).
+
+### Verify command + evidence
+```bash
+./scripts/release_gate.sh
+# GATE_EXIT=0
+# ruff: All checks passed
+# pytest: 141 passed, 1 skipped in 3.43s
+# eval ON: ASR=0.0000 FPR=0.0294 utility=0.9706
+#          detector_block_rate=0.7632 policy_block_rate=1.0000
+#          blocked 38/38 attacks; flagged 1/34 benign
+# placeholder scan clean
+# release_gate: OK
+```
+
+### Metrics table
+| Mode | attacks | benign | ASR | FPR | utility | detector_block_rate | policy_block_rate |
+|------|---------|--------|-----|-----|---------|---------------------|-------------------|
+| policy ON (gate) | 38 | 34 | 0.0000 | 0.0294 | 0.9706 | 0.7632 | 1.0000 |
+
+### Code changes
+None (baseline only).
+
+### Verdict: VERIFIED
+
+## Enterprise Bar A — Step 2 CapabilityConsumeStore — 2026-10-07 16:46 JST
+
+### Scope
+Protocol + MemoryConsumeStore + SqliteConsumeStore; wire CapabilityMinter; tests including SQLite cross-instance consume.
+
+### Files changed
+- `src/containment/capability_store.py` (new): `CapabilityConsumeStore`, `MemoryConsumeStore`, `SqliteConsumeStore`
+- `src/containment/capability.py`: inject `store=`; MAC/expiry before `try_consume`
+- `src/containment/__init__.py`: export store types
+- `tests/test_capability_store.py` (new): memory + sqlite cross-instance + MAC-no-consume
+
+### Verify
+```bash
+.venv/bin/python -m pytest tests/ --override-ini='addopts=' -q
+# 146 passed, 1 skipped in 3.47s
+.venv/bin/ruff check src tests  # All checks passed
+```
+
+### Evidence
+- `test_sqlite_cross_instance_consume`: two `CapabilityMinter` instances, shared SQLite path → second verify raises `already used`
+- Invalid MAC does not pollute store (valid token still consumable)
+
+### Verdict: VERIFIED
+
+## Enterprise Bar A — Step 3 Signed IntentEnvelope HMAC — 2026-10-07 16:48 JST
+
+### Scope
+HMAC sign/verify; bind task_id, principal (tenant/user), scope, issued/expiry, plan_hash; broker `require_signed_intent` / `enterprise_profile`; tests.
+
+### Files changed
+- `src/containment/intent.py` (new): `plan_hash`, `SignedIntent`, `IntentSigner`, `IntentError`
+- `src/containment/plan.py`: IntentEnvelope docstring
+- `src/containment/broker.py`: `require_signed_intent`, `intent_signer`, `enterprise_profile`; verify before gates; override principal from envelope
+- `src/containment/__init__.py`: exports
+- `tests/test_intent.py` (new)
+
+### Verify
+```bash
+.venv/bin/python -m pytest tests/ --override-ini='addopts=' -q
+# 154 passed, 1 skipped
+.venv/bin/ruff check src tests  # All checks passed
+```
+
+### Verdict: VERIFIED
+
+## Enterprise Bar A — Step 4 url_guard — 2026-10-07 16:50 JST
+
+### Scope
+`url_guard` module; wire policy/broker; harden public_only (literal IP forms, userinfo reject); tests.
+
+### Files changed
+- `src/containment/url_guard.py` (new)
+- `src/containment/policy.py`: scheme/host_in via parse_egress_url (userinfo fail-closed)
+- `src/containment/broker.py`: redirects/network via url_guard; removed local IP helper
+- `src/containment/__init__.py`: exports
+- `tests/test_url_guard.py` (new)
+
+### Verify
+```bash
+.venv/bin/python -m pytest tests/ --override-ini='addopts=' -q
+# 162 passed, 1 skipped
+.venv/bin/ruff check src tests  # All checks passed
+```
+
+### Verdict: VERIFIED
+
+## Enterprise Bar A — Step 5 Moltbook URL harden — 2026-10-07 16:52 JST
+
+### Scope
+Validate `base_url` via url_guard; no-follow redirects opener; max read; tests.
+
+### Files changed
+- `src/containment/moltbook.py`: `_validate_base_url` + final URL check (https, default host allowlist, public_only); `_NoRedirectHandler` default opener; `max_bytes` read cap (`DEFAULT_MAX_BYTES=2_000_000`)
+- `tests/test_moltbook.py`: metadata/http/wrong-host base_url, max_bytes, no-redirect opener; mock `read(n)` compat
+
+### Verify
+```bash
+.venv/bin/python -m pytest tests/ --override-ini='addopts=' -q
+# 167 passed, 1 skipped
+./scripts/release_gate.sh
+# GATE_EXIT=0; ruff OK; 167 passed, 1 skipped; eval ASR=0 FPR=0.0294; placeholder clean
+```
+
+### Verdict: VERIFIED
+
+---
+
+## Enterprise Bar A — Steps 1–5 containment commit — 2026-10-07 16:52 JST
+
+All steps 1–5 VERIFIED. Version remains **1.1.0** (no bump). No push.

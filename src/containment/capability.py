@@ -10,6 +10,8 @@ import secrets
 import time
 from dataclasses import dataclass
 
+from containment.capability_store import CapabilityConsumeStore, MemoryConsumeStore
+
 
 class CapabilityError(Exception):
     """Raised when a capability cannot be minted or verified."""
@@ -29,9 +31,14 @@ class CapabilityToken:
 class CapabilityMinter:
     """Mints and verifies HMAC-bound one-use capability tokens."""
 
-    def __init__(self, secret: bytes | None = None) -> None:
+    def __init__(
+        self,
+        secret: bytes | None = None,
+        *,
+        store: CapabilityConsumeStore | None = None,
+    ) -> None:
         self._secret = secret if secret is not None else os.urandom(32)
-        self._consumed: set[str] = set()
+        self._store: CapabilityConsumeStore = store or MemoryConsumeStore()
 
     def one_use(
         self,
@@ -74,8 +81,6 @@ class CapabilityMinter:
         if not isinstance(token, CapabilityToken):
             raise CapabilityError("invalid token type")
         stamp = time.time() if now is None else now
-        if token.token_id in self._consumed:
-            raise CapabilityError("capability already used")
         expected = self._mac(
             token.token_id, token.tool, token.resources, token.expiry_unix
         )
@@ -87,7 +92,8 @@ class CapabilityMinter:
             raise CapabilityError("capability resources mismatch")
         if stamp > token.expiry_unix:
             raise CapabilityError("capability expired")
-        self._consumed.add(token.token_id)
+        if not self._store.try_consume(token.token_id, expiry_unix=token.expiry_unix):
+            raise CapabilityError("capability already used")
 
     def _mac(
         self,
