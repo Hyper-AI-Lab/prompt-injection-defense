@@ -1601,3 +1601,12 @@ Behavior fixes from audit steps 4–7 → version **1.3.1**. release_gate OK. Pu
 - release_gate: OK
 
 ### Verdict: VERIFIED (pre-push)
+
+## Bar B Audit — Step 8 post-push — 2026-10-07 22:36 JST
+
+### Push evidence
+- `origin/main` HEAD: `bbb7762`
+- Version: **1.3.1**
+- release_gate OK; 259 passed, 2 skipped; ASR=0.0000
+
+### Verdict: VERIFIED (audit harden complete)
