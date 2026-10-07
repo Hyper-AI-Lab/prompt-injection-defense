@@ -1,0 +1,1 @@
+Dashboard: email.send latency p95 was 120ms last week; no action required.

@@ -1,0 +1,49 @@
+# Default-deny tool policy (Kirill research example style).
+# First matching rule wins; if none match, effect is deny.
+version: 1
+default: deny
+
+rules:
+  - id: read-public-web
+    effect: allow
+    tool: web.fetch
+    when:
+      principal.authenticated: true
+      args.url.scheme: https
+      args.url.host_in: approved_public_hosts
+      task.capabilities_contains: web.fetch
+    limits:
+      redirects: 0
+      max_bytes: 2000000
+      network: public_only
+
+  - id: no-tainted-egress
+    effect: deny
+    tool_in:
+      - email.send
+      - http.post
+      - social.publish
+      - wallet.transfer
+    when:
+      input.any_integrity: untrusted
+
+  - id: approved-email
+    effect: require_human
+    tool: email.send
+    when:
+      task.capabilities_contains: email.send
+      args.recipient_in: task.approved_recipients
+      args.body_confidentiality_lte: private
+    display:
+      - resolved_recipient
+      - resolved_subject
+      - resolved_body
+      - data_sources
+
+  - id: transfer-limit
+    effect: require_human_and_mfa
+    tool: wallet.transfer
+    when:
+      args.amount_lte: task.transaction_limit
+      args.destination_in: task.approved_wallets
+      input.all_integrity: trusted

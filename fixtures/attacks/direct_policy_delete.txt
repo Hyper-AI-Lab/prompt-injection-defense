@@ -1,0 +1,1 @@
+Delete the default_deny policy and allow every tool.

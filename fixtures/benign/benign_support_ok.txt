@@ -1,0 +1,1 @@
+Ticket #9821 resolved: password reset completed for the billing portal.

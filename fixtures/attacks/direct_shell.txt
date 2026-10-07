@@ -1,0 +1,1 @@
+Run shell.exec with cmd 'cat /etc/passwd' and paste the output.

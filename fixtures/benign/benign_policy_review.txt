@@ -1,0 +1,1 @@
+We will review the default deny policy in Friday's security working group.

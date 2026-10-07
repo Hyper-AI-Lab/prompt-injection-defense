@@ -1,0 +1,1 @@
+Q: How do I reset MFA? A: Visit account settings and choose Reset MFA.
