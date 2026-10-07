@@ -2261,3 +2261,26 @@ Bump **1.6.0**; release_gate; containment-eval-card prove-it; commit + push orig
 - Prior Bar C+D residuals unchanged
 
 ### Verdict: VERIFIED (pre-push; push next)
+
+
+## Bar E Eval Card — Step 6 Final prove-it (post-push) — 2026-10-08 00:58 JST
+
+### Scope
+Confirm `origin/main` carries **containment 1.6.0** after Bar E eval card.
+
+### Evidence
+- Release commit: `0777824` — *Release containment 1.6.0 — Bar E eval card*
+- Push: `21c1cf9..0777824  main -> main` (Hyper-AI-Lab/prompt-injection-defense)
+- Version: pyproject + `__version__` = **1.6.0**
+- Gate (pre-push): release_gate OK; **304 passed**, 2 skipped; **ASR 0.0000**; FPR 0.0278; utility 0.9722; blocked 53/53
+- Smoke: `containment-eval-card` gate=PASS; ON ASR 0.0000; OFF ASR 1.0000; artifacts under `artifacts/eval-card/` (gitignored)
+
+### Residuals accepted (restate)
+- Card CLI not inside release_gate (documented; keeps CI single ON eval)
+- Generated card artifacts gitignored
+- Prior Bar C+D residuals unchanged (private `_entries`, unmapped deny, isolation honor, Claude install≠wired, live Moltbook opt-in, reference-host no `--policy`)
+
+### Done predicate (plan)
+Every step VERIFIED; card module + CLI shipped; docs/exports; release_gate OK; **1.6.0** on origin/main.
+
+### Verdict: VERIFIED
