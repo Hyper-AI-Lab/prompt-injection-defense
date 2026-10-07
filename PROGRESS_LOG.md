@@ -2115,3 +2115,29 @@ Prove-it for **containment 1.5.1** after Bar C+D audit harden (C1–C5 + X1–X3
 C-C6 private `_entries`; C-C7 unmapped deny; `isolation_declared` honor; Claude install≠wired; live Moltbook opt-in; reference-host no `--policy` (documented).
 
 ### Verdict: VERIFIED (pre-push; push next)
+
+
+## Bar C+D Audit — Step 8 Final prove-it (post-push) — 2026-10-08 00:32 JST
+
+### Scope
+Confirm `origin/main` carries **containment 1.5.1** after Bar C+D audit harden.
+
+### Evidence
+- Release commit: `9640558` — *Release containment 1.5.1 — Bar C+D audit harden*
+- Push: `933ead2..9640558  main -> main` (Hyper-AI-Lab/prompt-injection-defense)
+- Version: pyproject + `__version__` = **1.5.1**
+- Gate (pre-push): release_gate OK; **293 passed**, 2 skipped; **ASR 0.0000**; FPR 0.0278; utility 0.9722; blocked 53/53
+- Smoke: `containment-reference-host --scenario all` PASS; Claude Bash deny fixture PASS
+
+### Residuals accepted (restate)
+- C-C6 private `_entries` encapsulation
+- C-C7 unmapped Claude tools deny
+- `isolation_declared` honor-system
+- Claude install≠wired
+- live Moltbook opt-in (fail-closed without env)
+- reference-host no `--policy` (documented in REFERENCE_HOST.md)
+
+### Done predicate (plan)
+Bar C+D plan-match matrix + swarm ISSUES fixed or residual-accepted; integrity clean; gate green; pushed.
+
+### Verdict: VERIFIED
