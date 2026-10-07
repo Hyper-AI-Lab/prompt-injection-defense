@@ -97,3 +97,27 @@ API fit notes: primary product surface is `create_prompt_defense().defend_tool_r
 **URLs:** https://github.com/invariantlabs-ai/invariant — https://pypi.org/project/invariant-ai/ — https://invariantlabs.ai
 
 **Wire:** none in v1.0.
+
+---
+
+## 2026-10-07 — Policy YAML limits enforcement (AUDIT harden step 8 / H4)
+
+### Choice
+**Enforce** all three keys shipped under `read-public-web.limits` in
+`policies/default_deny.yaml` inside `ToolBroker.secure_execute` via
+`_limits_violation` (no silent pass-through):
+
+| Key | Enforcement |
+|-----|-------------|
+| `max_bytes` | Deny when argument payload fields (`body`/`content`/`data`/`payload`/`text`) exceed the byte cap. Cap is also attached on `PolicyDecision.limits` for executors. |
+| `redirects` | Deny when args request `redirects`/`max_redirects` above the cap, or `allow_redirects: true` when cap is `0`. |
+| `network: public_only` | Deny when `url` host is a literal loopback/private/link-local/unspecified/multicast/reserved IP (or `localhost`). No DNS resolution / no full SSRF stack. |
+
+Unknown limit keys fail closed (`unenforced limit keys present`). No keys were stripped from YAML this step because all three are enforceable without inventing a network fetch stack.
+
+### Rationale
+AUDIT H4: parsed-then-ignored scaffold. Prefer enforce over strip when possible (plan step 8). Response-body download capping still requires the executor to honor `decision.limits["max_bytes"]` at fetch time; the broker enforces argument-side overflows and binding metadata.
+
+### Links
+- Plan: `AUDIT_HARDEN_PLAN.md` step 8
+- Finding: `AUDIT_CODE_FINDINGS.md` H4

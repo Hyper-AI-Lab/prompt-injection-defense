@@ -99,3 +99,12 @@ def test_ingest_candidate_from_raw_json() -> None:
     assert result.ok is True
     assert result.extract is not None
     assert result.extract.data["topic"] == "news"
+
+
+def test_default_ingest_cascade_is_rules_only_not_fake() -> None:
+    """H3: production default must not be FakeStage1Detector."""
+    from containment.detectors.piguard import FakeStage1Detector, RulesOnlyDetector
+
+    cascade = default_ingest_cascade()
+    assert isinstance(cascade.stage1, RulesOnlyDetector)
+    assert not isinstance(cascade.stage1, FakeStage1Detector)

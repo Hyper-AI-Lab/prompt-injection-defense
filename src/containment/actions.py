@@ -68,6 +68,8 @@ class PolicyDecision:
     rule_id: str
     reason: str = ""
     requires_mfa: bool = False
+    display: tuple[str, ...] | None = None
+    limits: Mapping[str, Any] | None = None
 
     def __post_init__(self) -> None:
         if self.effect not in _VALID_EFFECTS:
@@ -83,6 +85,15 @@ class PolicyDecision:
             raise TypeError("requires_mfa must be bool")
         if self.requires_mfa and self.effect != "require_human":
             raise ValueError("requires_mfa is only valid with effect=require_human")
+        if self.display is not None:
+            if not isinstance(self.display, tuple) or not all(
+                isinstance(d, str) for d in self.display
+            ):
+                raise TypeError("display must be tuple[str, ...] | None")
+        if self.limits is not None:
+            if not isinstance(self.limits, Mapping):
+                raise TypeError("limits must be a mapping | None")
+            object.__setattr__(self, "limits", _freeze_mapping(self.limits))
 
 
 @dataclass(frozen=True, slots=True)

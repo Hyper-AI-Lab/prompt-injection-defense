@@ -2,15 +2,23 @@
 
 from __future__ import annotations
 
+import ipaddress
+import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlparse
 
 from containment.actions import PolicyDecision, ProposedAction
 from containment.audit import AuditLog
 from containment.capability import CapabilityMinter, CapabilityToken
+from containment.detectors.base import CascadeResult
+from containment.detectors.cascade import PRIVILEGED_SINKS, privileged_sink_fail_closed
 from containment.plan import Plan
 from containment.policy import PolicyEngine
+
+# Privileged / no-tainted-egress tools must carry non-empty input_labels (H1).
+_LABEL_REQUIRED_SINKS: frozenset[str] = PRIVILEGED_SINKS | frozenset({"social.publish"})
 
 
 class SecurityViolation(Exception):
@@ -21,7 +29,18 @@ class SecurityViolation(Exception):
         self.decision = decision
 
 
-ApprovalHook = Callable[[ProposedAction, PolicyDecision], None]
+@dataclass(frozen=True, slots=True)
+class ApprovalOutcome:
+    """Result of a human approval hook.
+
+    For ``requires_mfa`` decisions, ``mfa_verified`` must be True or the
+    broker fails closed before mint.
+    """
+
+    mfa_verified: bool = False
+
+
+ApprovalHook = Callable[[ProposedAction, PolicyDecision], ApprovalOutcome | None]
 SchemaValidator = Callable[[str, Mapping[str, Any]], None]
 Executor = Callable[[ProposedAction, CapabilityToken], Any]
 
@@ -94,6 +113,8 @@ class ToolBroker:
         plan: Plan,
         principal_authenticated: bool = True,
         expiry_seconds: float = 60.0,
+        cascade: CascadeResult | None = None,
+        fail_closed_privileged: bool = False,
     ) -> BrokerResult:
         # 1) Optional known-tool gate (deny unknown before policy noise).
         if self.known_tools is not None and action.tool not in self.known_tools:
@@ -120,28 +141,119 @@ class ToolBroker:
             self.audit.append_decision(action, decision)
             raise SecurityViolation(str(exc), decision=decision) from exc
 
-        # 3) Policy evaluate.
+        # 3) Empty-label fail-closed on privileged / egress sinks (H1).
+        if action.tool in _LABEL_REQUIRED_SINKS and not action.input_labels:
+            decision = PolicyDecision(
+                effect="deny",
+                rule_id="empty_input_labels",
+                reason=(
+                    f"privileged sink {action.tool!r} requires non-empty "
+                    "input_labels (fail closed)"
+                ),
+            )
+            self.audit.append_decision(action, decision)
+            raise SecurityViolation(decision.reason, decision=decision)
+
+        # 3b) Plan expiry (M4).
+        if plan.expiry_unix is not None and time.time() > float(plan.expiry_unix):
+            decision = PolicyDecision(
+                effect="deny",
+                rule_id="plan_expired",
+                reason=f"plan expired at unix {plan.expiry_unix}",
+            )
+            self.audit.append_decision(action, decision)
+            raise SecurityViolation(decision.reason, decision=decision)
+
+        # 3c) Plan step binding (M1): step id must exist and tool must match.
+        try:
+            step = plan.step_by_id(action.plan_step)
+        except KeyError:
+            decision = PolicyDecision(
+                effect="deny",
+                rule_id="plan_step_unknown",
+                reason=f"unknown plan_step {action.plan_step!r}",
+            )
+            self.audit.append_decision(action, decision)
+            raise SecurityViolation(decision.reason, decision=decision) from None
+        if step.tool != action.tool:
+            decision = PolicyDecision(
+                effect="deny",
+                rule_id="plan_step_tool_mismatch",
+                reason=(
+                    f"plan step {action.plan_step!r} tool {step.tool!r} "
+                    f"!= action tool {action.tool!r}"
+                ),
+            )
+            self.audit.append_decision(action, decision)
+            raise SecurityViolation(decision.reason, decision=decision)
+
+        # 4) Policy evaluate.
         decision = self.policy.evaluate(
             action,
             plan=plan,
             principal_authenticated=principal_authenticated,
         )
 
-        # 4) Audit append (every decision).
+        # 4b) Detector fail-closed for privileged sinks (H2).
+        # Overrides allow/require_human before mint when cascade or selection says so.
+        if decision.effect != "deny":
+            cascade_blocks = cascade is not None and privileged_sink_fail_closed(
+                action.tool, cascade
+            )
+            selection_blocks = fail_closed_privileged and action.tool in PRIVILEGED_SINKS
+            if cascade_blocks or selection_blocks:
+                decision = PolicyDecision(
+                    effect="deny",
+                    rule_id="detector_fail_closed",
+                    reason=(
+                        f"privileged sink {action.tool!r} denied: detector "
+                        "fail-closed (cascade risk or rules-only selection)"
+                    ),
+                )
+
+        # 4c) Enforce matched-rule limits (H4) — no silent pass-through keys.
+        if decision.effect != "deny" and decision.limits:
+            limit_reason = _limits_violation(action, decision.limits)
+            if limit_reason is not None:
+                decision = PolicyDecision(
+                    effect="deny",
+                    rule_id="limits_violation",
+                    reason=limit_reason,
+                    display=decision.display,
+                    limits=dict(decision.limits),
+                )
+
+        # 5) Audit append (every decision).
         self.audit.append_decision(action, decision)
 
-        # 5) Deny path.
+        # 6) Deny path.
         if decision.effect == "deny":
             raise SecurityViolation(
                 f"denied by {decision.rule_id}: {decision.reason}",
                 decision=decision,
             )
 
-        # 6) Human approval hook for require_human.
+        # 7) Human approval hook for require_human (+ MFA / display).
         if decision.effect == "require_human":
-            self.approval(action, decision)
+            outcome = self.approval(action, decision)
+            if decision.requires_mfa:
+                verified = (
+                    isinstance(outcome, ApprovalOutcome) and outcome.mfa_verified
+                )
+                if not verified:
+                    decision = PolicyDecision(
+                        effect="deny",
+                        rule_id="mfa_required",
+                        reason=(
+                            f"MFA verification required for {action.tool} "
+                            f"(rule {decision.rule_id})"
+                        ),
+                        display=decision.display,
+                    )
+                    self.audit.append_decision(action, decision)
+                    raise SecurityViolation(decision.reason, decision=decision)
 
-        # 7) Mint one-use capability.
+        # 8) Mint one-use capability.
         resources = _resource_hints(action)
         token = self.minter.one_use(
             tool=action.tool,
@@ -155,6 +267,84 @@ class ToolBroker:
             result = self.executor(action, token)
 
         return BrokerResult(decision=decision, capability=token, result=result)
+
+
+
+_ENFORCED_LIMIT_KEYS = frozenset({"max_bytes", "redirects", "network"})
+_PAYLOAD_ARG_KEYS = ("body", "content", "data", "payload", "text")
+
+
+def _limits_violation(action: ProposedAction, limits: Mapping[str, Any]) -> str | None:
+    """Return a deny reason if action violates enforced policy limits, else None.
+
+    Unknown limit keys fail closed (must not remain silently unenforced).
+    """
+    unknown = set(limits) - _ENFORCED_LIMIT_KEYS
+    if unknown:
+        return f"unenforced limit keys present: {sorted(unknown)}"
+
+    if "max_bytes" in limits:
+        max_b = int(limits["max_bytes"])
+        if max_b < 0:
+            return "max_bytes must be >= 0"
+        for key in _PAYLOAD_ARG_KEYS:
+            value = action.arguments.get(key)
+            if isinstance(value, (str, bytes)) and len(value) > max_b:
+                return f"argument {key!r} exceeds max_bytes {max_b}"
+
+    if "redirects" in limits:
+        limit_r = int(limits["redirects"])
+        if limit_r < 0:
+            return "redirects must be >= 0"
+        for key in ("redirects", "max_redirects"):
+            if key in action.arguments:
+                raw = action.arguments[key]
+                if isinstance(raw, (int, float)) and int(raw) > limit_r:
+                    return f"argument {key!r} exceeds policy redirects {limit_r}"
+        if "allow_redirects" in action.arguments and bool(
+            action.arguments["allow_redirects"]
+        ):
+            if limit_r <= 0:
+                return "allow_redirects true violates redirects <= 0"
+
+    if "network" in limits:
+        network = limits["network"]
+        if network != "public_only":
+            return f"unsupported network limit {network!r}"
+        url = action.arguments.get("url")
+        if isinstance(url, str) and url.strip():
+            if _url_host_not_public(url):
+                return "network public_only: URL host is not a public address"
+
+    return None
+
+
+def _url_host_not_public(url: str) -> bool:
+    """True when URL host is loopback, private, link-local, or unspecified.
+
+    Hostname resolution is not performed (no network stack); literal IPs and
+    well-known local hostnames are classified from the URL string only.
+    """
+    host = urlparse(url).hostname
+    if host is None or not host.strip():
+        return True
+    lowered = host.lower().rstrip(".")
+    if lowered in {"localhost", "localhost.localdomain"}:
+        return True
+    try:
+        ip = ipaddress.ip_address(lowered)
+    except ValueError:
+        # Non-literal hostname: cannot prove private without DNS — allow
+        # host allowlist predicates to govern names; only literal IPs blocked here.
+        return False
+    return bool(
+        ip.is_private
+        or ip.is_loopback
+        or ip.is_link_local
+        or ip.is_unspecified
+        or ip.is_multicast
+        or ip.is_reserved
+    )
 
 
 def _resource_hints(action: ProposedAction) -> tuple[str, ...]:

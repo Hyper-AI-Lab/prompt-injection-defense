@@ -13,7 +13,7 @@ from typing import Any
 
 from containment.detectors.base import CascadeResult
 from containment.detectors.cascade import DetectorCascade
-from containment.detectors.piguard import FakeStage1Detector, RulesOnlyDetector
+from containment.detectors.piguard import RulesOnlyDetector, select_stage1
 from containment.labels import Confidentiality, Integrity, SecurityLabel
 from containment.quarantine import (
     ALLOWLIST_SUMMARY_SCHEMA,
@@ -50,8 +50,13 @@ class IngestResult:
 
 
 def default_ingest_cascade() -> DetectorCascade:
-    """Offline-safe cascade: Stage0 rules + FakeStage1 (keyword elevation)."""
-    return DetectorCascade(stage1=FakeStage1Detector())
+    """Production offline cascade: Stage0 + RulesOnly (fail_closed metadata).
+
+    FakeStage1Detector is for tests/eval helpers only — not this default.
+    For real ML Stage-1 use ``select_stage1(prefer="piguard", allow_download=...)``.
+    """
+    selection = select_stage1(prefer="rules_only")
+    return DetectorCascade(stage1=selection.detector)
 
 
 def ingest(

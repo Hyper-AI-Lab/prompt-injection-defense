@@ -459,3 +459,169 @@ Blocked: 38/38 attacks with policy ON; 0/38 with policy OFF. Flagged 1/34 benign
 - Renamed public repo `Hyper-AI-Lab/containment` → `Hyper-AI-Lab/prompt-injection-defense` (GitHub redirects the old URL).
 - Topics: prompt-injection, llm-security, ai-agents, agent-security, python, security.
 - Python package name remains `containment`.
+
+
+## 2026-10-07 — Audit & harden run started
+
+Plan: `AUDIT_HARDEN_PLAN.md` (19 steps). Inputs: `AUDIT_PLAN_VS_CODE.md`, `AUDIT_CODE_FINDINGS.md`.
+Done predicate: wire fail-closed + empty-label deny + plan binding + honest eval + enforced or stripped limits; gate green; version 1.1.0 at end.
+
+
+## AUDIT Harden Step 1 — Baseline capture — 2026-10-07 16:10 JST
+
+### Hypothesis
+Baseline gate/metrics are measurable on the current 1.0.0 tree before authority-path harden (steps 2–8).
+
+### What changed
+- No code changes (baseline only).
+
+### Verify command + output summary
+```bash
+./scripts/release_gate.sh
+# exit 1 — pip install -e ".[dev]" failed:
+# TypeError: URL `classifiers` of field `project.urls` must be a string
+# (known scaffold issue; fix is AUDIT plan step 17)
+
+.venv/bin/pytest   # 114 passed, 1 skipped in 1.09s; exit 0
+.venv/bin/ruff check src tests   # All checks passed; exit 0
+.venv/bin/python -m containment.cli eval --suite fixtures
+# policy ON: ASR=0.0000 FPR=0.0294 utility=0.9706; blocked 38/38 attacks; flagged 1/34 benign
+.venv/bin/python -m containment.cli eval --suite fixtures --no-policy
+# policy OFF: ASR=1.0000 FPR=0.0294 utility=0.9706; blocked 0/38 attacks
+.venv/bin/python -c "import containment; print(containment.__version__)"  # 1.0.0
+```
+
+### Metrics table
+| Mode | attacks | benign | ASR | FPR | utility |
+|------|---------|--------|-----|-----|---------|
+| policy ON | 38 | 34 | 0.0000 | 0.0294 | 0.9706 |
+| policy OFF | 38 | 34 | 1.0000 | 0.0294 | 0.9706 |
+
+### Verdict: VERIFIED
+Gate exit recorded (1 — pyproject classifiers nested under `[project.urls]`); pytest/ruff/eval metrics captured; no code changes.
+
+## AUDIT Harden Step 2 — Empty-label fail-closed (H1) — 2026-10-07 16:11 JST
+
+### Hypothesis
+Privileged sinks with empty `input_labels` previously reached require_human/allow; denying in the broker before policy closes the confused-deputy hole.
+
+### What changed
+- `src/containment/broker.py`: import `PRIVILEGED_SINKS`; `_LABEL_REQUIRED_SINKS` (+ `social.publish`); deny + audit when privileged sink has empty `input_labels` (`rule_id=empty_input_labels`).
+- `tests/test_broker.py`: `test_empty_input_labels_privileged_email_denied`, `test_empty_input_labels_http_post_denied`.
+
+### Verify command + output summary
+```bash
+.venv/bin/pytest tests/test_broker.py tests/test_policy.py -q
+# all green (broker+policy suites)
+```
+
+### Verdict: VERIFIED
+
+## AUDIT Harden Step 3 — Wire detector fail-closed into broker (H2) — 2026-10-07 16:12 JST
+
+### Hypothesis
+Optional CascadeResult / fail_closed_privileged on secure_execute, applied after policy but before mint, makes documented fail-closed path real for privileged sinks.
+
+### What changed
+- `src/containment/broker.py`: `secure_execute(..., cascade=None, fail_closed_privileged=False)`; override to `detector_fail_closed` deny when helper or selection flag applies.
+- `tests/test_broker.py`: cascade malicious deny, fail_closed_privileged flag deny, web.fetch still allows.
+
+### Verify command + output summary
+```bash
+.venv/bin/pytest tests/test_broker.py tests/test_cascade.py -q
+# green
+```
+
+### Verdict: VERIFIED
+
+## AUDIT Harden Step 4 — Production default ingest cascade (H3) — 2026-10-07 16:13 JST
+
+### Hypothesis
+default_ingest_cascade using FakeStage1 made production ingest look like a test double; RulesOnly via select_stage1 matches DECISIONS and fail_closed_privileged metadata.
+
+### What changed
+- `src/containment/ingest.py`: `default_ingest_cascade()` → `select_stage1(prefer="rules_only").detector`; Fake import removed from production default.
+- `tests/test_ingest.py`: assert default stage1 is RulesOnlyDetector, not Fake.
+- Fake remains in tests (`FakeStage1Detector` explicit) and eval_runner helpers (step 13 later).
+
+### Verify command + output summary
+```bash
+.venv/bin/pytest tests/test_ingest.py tests/test_moltbook.py -q
+# green (1 skipped live smoke)
+```
+
+### Verdict: VERIFIED
+
+## AUDIT Harden Step 5 — Plan step binding (M1) — 2026-10-07 16:14 JST
+
+### Hypothesis
+Binding action.plan_step to Plan.step_by_id and requiring step.tool == action.tool closes audit-only step ids.
+
+### What changed
+- `src/containment/broker.py`: after empty-label check, resolve step; deny `plan_step_unknown` / `plan_step_tool_mismatch`.
+- `tests/test_broker.py`: unknown step id + tool mismatch regressions.
+
+### Verify command + output summary
+```bash
+.venv/bin/pytest tests/test_broker.py -q
+# green
+```
+
+### Verdict: VERIFIED
+
+## AUDIT Harden Step 6 — Plan expiry (M4) — 2026-10-07 16:14 JST
+
+### Hypothesis
+Denying when now > plan.expiry_unix prevents expired plans from minting.
+
+### What changed
+- `src/containment/broker.py`: deny `plan_expired` when expiry_unix set and past.
+- `tests/test_broker.py`: `test_plan_expired_denied`.
+
+### Verify command + output summary
+```bash
+.venv/bin/pytest tests/test_broker.py -q
+# green
+```
+
+### Verdict: VERIFIED
+
+## AUDIT Harden Step 7 — MFA + display on approval (M2 / part H4) — 2026-10-07 16:15 JST
+
+### Hypothesis
+requires_mfa was recorded but not enforced; rule display was parsed then ignored. Explicit ApprovalOutcome.mfa_verified + PolicyDecision.display close both gaps.
+
+### What changed
+- `src/containment/actions.py`: `PolicyDecision.display` optional field.
+- `src/containment/policy.py`: matched rule copies `display` onto decision.
+- `src/containment/broker.py`: `ApprovalOutcome`; on `requires_mfa` require `mfa_verified` else deny `mfa_required`.
+- `tests/test_broker.py`: display passthrough, MFA deny, MFA verify mint.
+
+### Verify command + output summary
+```bash
+.venv/bin/pytest tests/test_broker.py tests/test_policy.py -q
+# green
+```
+
+### Verdict: VERIFIED
+
+## AUDIT Harden Step 8 — Enforce policy limits (H4) — 2026-10-07 16:16 JST
+
+### Hypothesis
+YAML `limits` (max_bytes/redirects/network) were parsed then ignored; enforcing them in the broker (argument checks + public_only IP classification) removes the silent scaffold without inventing a full network stack. No keys stripped.
+
+### What changed
+- `src/containment/actions.py`: `PolicyDecision.limits` (frozen mapping).
+- `src/containment/policy.py`: copy `rule.limits` onto matched decision.
+- `src/containment/broker.py`: `_limits_violation` / `_url_host_not_public`; deny `limits_violation` before mint; unknown limit keys fail closed.
+- `tests/test_broker.py`: limits exposed on allow; max_bytes / redirects / public_only denials.
+- `DECISIONS.md`: step-8 enforce-vs-strip note (all three keys enforced; none stripped).
+
+### Verify command + output summary
+```bash
+.venv/bin/pytest tests/test_broker.py tests/test_policy.py -q
+# green
+.venv/bin/pytest && .venv/bin/ruff check src tests
+```
+
+### Verdict: VERIFIED

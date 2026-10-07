@@ -104,6 +104,8 @@ class PolicyEngine:
                     rule_id=rule.id,
                     reason=f"matched rule {rule.id}",
                     requires_mfa=mfa,
+                    display=rule.display,
+                    limits=dict(rule.limits) if rule.limits is not None else None,
                 )
         return PolicyDecision(
             effect="deny",
