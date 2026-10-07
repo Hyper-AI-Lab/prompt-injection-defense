@@ -18,7 +18,9 @@ from containment.detectors.piguard import (
     PIGuardDetector,
     RulesOnlyDetector,
     Stage1Selection,
+    make_stage1_cascade,
     select_stage1,
+    stage1_from_env,
 )
 from containment.detectors.rules import Finding, RulesDetector, Stage0Result, scan_stage0
 
@@ -41,4 +43,6 @@ __all__ = [
     "privileged_sink_fail_closed",
     "scan_stage0",
     "select_stage1",
+    "make_stage1_cascade",
+    "stage1_from_env",
 ]

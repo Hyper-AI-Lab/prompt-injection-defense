@@ -79,3 +79,56 @@ If the decision is `deny`, stop. If `require_human`, obtain exact approval
 ## 6. Skill file
 
 Follow [SKILL.md](../SKILL.md) for the condensed bot procedure.
+
+## 7. Optional PIGuard Stage-1 (`CONTAINMENT_STAGE1`)
+
+Default `ingest()` uses **RulesOnly** (offline, fail-closed metadata). To enable
+optional PIGuard:
+
+```bash
+pip install -e ".[dev,ml]"   # or: pip install 'containment[ml]'
+# First enable needs network *or* a pre-seeded Hugging Face cache.
+export CONTAINMENT_STAGE1=piguard
+export CONTAINMENT_PIGUARD_ALLOW_DOWNLOAD=1   # required to call try_load
+```
+
+Or wire explicitly (recommended for production hosts):
+
+```python
+from containment import ingest, make_stage1_cascade
+from containment.actions import ProposedAction
+
+casc, sel = make_stage1_cascade(prefer="piguard", allow_download=True)
+result = ingest(raw, source=..., task_id=..., candidate=..., cascade=casc)
+# Detectors advise only — always pass cascade + fail-closed into the broker:
+broker.secure_execute(
+    action,
+    plan=plan,
+    cascade=result.cascade,
+    fail_closed_privileged=sel.fail_closed_privileged,
+)
+```
+
+Notes:
+
+- `allow_download=True` is required to attempt PIGuard load (HF may still use a
+  local cache and not re-download). Cached weights alone do **not** enable
+  PIGuard when `allow_download=False`.
+- PIGuard-on does **not** replace policy/broker; detectors never authorize.
+- Env vars: `CONTAINMENT_STAGE1=rules_only|piguard|fake` and
+  `CONTAINMENT_PIGUARD_ALLOW_DOWNLOAD=0|1` (see also `CONTAINMENT_LIVE_MOLTBOOK`).
+
+## 8. Host must still provide (residual checklist)
+
+This library is not a sandbox. Independently of PIGuard-on, hosts **must** still:
+
+1. **OS / container process isolation** — package code runs in-process with the agent.
+2. **Network egress proxy / DNS-aware SSRF controls** beyond `url_guard` helpers
+   (helpers cover literal metadata/private IPs and userinfo; not full DNS rebinding).
+3. **Secret vault** for `CapabilityMinter` / `IntentSigner` HMAC secrets (rotate;
+   never commit plaintext secrets).
+4. **External WORM / signed log shipping** for audit JSONL (file hash chain is
+   tamper-*evidence*, not WORM).
+5. **Supply-chain review** of Hugging Face `trust_remote_code=True` before
+   turning PIGuard on.
+6. **Rate limits / spend caps** for model and tool APIs (LLM10 residual).

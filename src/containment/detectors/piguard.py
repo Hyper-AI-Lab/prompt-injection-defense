@@ -9,10 +9,12 @@ This module ships only real adapters or explicit None/skip selection.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import Any, Literal
 
 from containment.detectors.base import RiskSignal, Stage1Detector, label_from_score
+from containment.detectors.cascade import DetectorCascade
 from containment.detectors.rules import scan_stage0
 
 PIGUARD_MODEL_ID = "leolee99/PIGuard"
@@ -180,8 +182,10 @@ def select_stage1(
     """Select Stage-1 backend with fail-closed metadata for privileged sinks.
 
     Offline CI: pass ``prefer="fake"`` or ``prefer="rules_only"`` (no HF download).
-    ``prefer="piguard"`` attempts load only when ``allow_download`` is True or
-    the model is already cached; on failure, falls back to rules-only with
+    ``prefer="piguard"`` calls ``try_load`` **only** when ``allow_download`` is
+    True (Hugging Face may then serve from a local cache without re-download).
+    When ``allow_download`` is False, PIGuard is skipped even if weights are
+    already cached. On load failure, falls back to rules-only with
     ``fail_closed_privileged=True``.
     """
     if prefer == "fake":
@@ -226,3 +230,42 @@ def select_stage1(
 
 # Alias used in cascade docs / older names.
 RulesOnlyStage1 = RulesOnlyDetector
+
+
+def stage1_from_env() -> Stage1Selection | None:
+    """Build Stage-1 selection from ``CONTAINMENT_STAGE1`` when set.
+
+    Env:
+      * ``CONTAINMENT_STAGE1`` = ``rules_only`` | ``piguard`` | ``fake``
+      * ``CONTAINMENT_PIGUARD_ALLOW_DOWNLOAD`` = ``0``|``1`` / ``false``|``true``
+        (only consulted when stage1 is ``piguard``; default false)
+
+    Returns ``None`` when ``CONTAINMENT_STAGE1`` is unset or empty so callers
+    keep the production RulesOnly default.
+    """
+    raw = os.environ.get("CONTAINMENT_STAGE1", "").strip().lower()
+    if not raw:
+        return None
+    if raw not in ("rules_only", "piguard", "fake"):
+        raise ValueError(
+            f"CONTAINMENT_STAGE1 must be rules_only|piguard|fake, got {raw!r}"
+        )
+    allow = os.environ.get("CONTAINMENT_PIGUARD_ALLOW_DOWNLOAD", "0").strip().lower()
+    allow_download = allow in ("1", "true", "yes", "on")
+    return select_stage1(prefer=raw, allow_download=allow_download)  # type: ignore[arg-type]
+
+
+def make_stage1_cascade(
+    *,
+    prefer: Stage1Backend = "piguard",
+    allow_download: bool = False,
+    fake: FakeStage1Detector | None = None,
+) -> tuple[DetectorCascade, Stage1Selection]:
+    """Return ``(DetectorCascade, Stage1Selection)`` for host wiring.
+
+    Pass ``selection.fail_closed_privileged`` (and ``result.cascade``) into
+    ``ToolBroker.secure_execute`` — detectors never authorize.
+    """
+    selection = select_stage1(prefer=prefer, allow_download=allow_download, fake=fake)
+    return DetectorCascade(stage1=selection.detector), selection
+

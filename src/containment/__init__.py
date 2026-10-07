@@ -11,7 +11,7 @@ from containment.capability_store import (
 )
 from containment.datamark import DatamarkedText, mark, unwrap
 from containment.detectors.cascade import DetectorCascade
-from containment.detectors.piguard import select_stage1
+from containment.detectors.piguard import make_stage1_cascade, select_stage1, stage1_from_env
 from containment.ingest import IngestResult, ingest
 from containment.intent import IntentError, IntentSigner, SignedIntent, plan_hash
 from containment.labels import SecurityLabel
@@ -32,7 +32,7 @@ from containment.url_guard import (
     parse_egress_url,
 )
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 __all__ = [
     "ALLOWLIST_SUMMARY_SCHEMA",
@@ -77,5 +77,7 @@ __all__ = [
     "plan_hash",
     "read_posts",
     "select_stage1",
+    "make_stage1_cascade",
+    "stage1_from_env",
     "unwrap",
 ]

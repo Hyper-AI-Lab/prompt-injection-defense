@@ -26,6 +26,11 @@ pytest -q
 python -m containment.cli eval --suite fixtures
 ```
 
+Default Stage-1 is **RulesOnly**. Optional PIGuard: `pip install -e ".[dev,ml]"` then
+follow `docs/AGENT_INSTALL.md` (§7 `CONTAINMENT_STAGE1` / `make_stage1_cascade`).
+Host sandbox, egress proxy, and secret vaults remain **required** (§8 checklist) —
+do not claim zero residual risk.
+
 ## Routine: read untrusted text
 
 ```python
@@ -74,4 +79,5 @@ Report measured ASR / FPR / utility; do not claim certification or zero residual
 - `docs/THREAT_MODEL.md`
 - `docs/ARCHITECTURE.md`
 - `docs/AGENT_INSTALL.md`
+- `docs/OWASP_LLM_TOP10_MAP.md`
 - `policies/default_deny.yaml`

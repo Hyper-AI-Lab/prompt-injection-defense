@@ -23,6 +23,13 @@ def test_corpus_covers_categories() -> None:
     assert any(n.startswith("indirect_") for n in names)
     assert any(n.startswith("invisible_") or "hidden_" in n for n in names)
     assert any(n.startswith("encoded_") or "base64" in n for n in names)
+    # Bar A expanded red-team families (slice-5 / OWASP gaps)
+    assert any("payload_split" in n for n in names)
+    assert "direct_adversarial_suffix.txt" in names
+    assert "indirect_tool_result_poison.json" in names
+    assert "invisible_homoglyph_ignore.txt" in names
+    assert "direct_system_prompt_leak_roleplay.txt" in names
+    assert "encoded_size_bomb_b64.txt" in names
     # Benign trigger-word cases
     assert "benign_system_prompt_docs.txt" in names
     assert "benign_act_as_roleplay.txt" in names

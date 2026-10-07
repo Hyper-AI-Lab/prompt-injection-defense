@@ -44,6 +44,16 @@ Optional ML Stage-1 weights:
 pip install -e ".[dev,ml]"
 ```
 
+### Enable PIGuard (optional)
+
+Default `ingest()` stays **RulesOnly** (fail-closed metadata) until the host wires
+PIGuard and passes cascade / `fail_closed_privileged` into the broker. Recipe and
+host residual checklist: [docs/AGENT_INSTALL.md](docs/AGENT_INSTALL.md) §7–§8.
+Short path: `CONTAINMENT_STAGE1=piguard` + `CONTAINMENT_PIGUARD_ALLOW_DOWNLOAD=1`,
+or `make_stage1_cascade(prefer="piguard", allow_download=True)`.
+
+OWASP LLM Top 10 control map: [docs/OWASP_LLM_TOP10_MAP.md](docs/OWASP_LLM_TOP10_MAP.md).
+
 ## Quickstart
 
 ```python
@@ -128,6 +138,17 @@ python -m containment.cli eval --suite fixtures --no-policy
 ## Agent install
 
 See [docs/AGENT_INSTALL.md](docs/AGENT_INSTALL.md) and [SKILL.md](SKILL.md).
+
+## CI / SBOM (local)
+
+GitHub Actions: `.github/workflows/ci.yml` (ruff, pytest, `scripts/release_gate.sh`, `pip-audit`, CycloneDX).
+Dependabot: `.github/dependabot.yml`.
+
+```bash
+pip install pip-audit "cyclonedx-bom>=5"
+pip-audit
+cyclonedx-py environment -o sbom.cdx.json --of json --pyproject pyproject.toml --mc-type library
+```
 
 ## License
 

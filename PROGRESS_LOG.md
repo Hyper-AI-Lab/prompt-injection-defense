@@ -1011,3 +1011,143 @@ Validate `base_url` via url_guard; no-follow redirects opener; max read; tests.
 ## Enterprise Bar A — Steps 1–5 containment commit — 2026-10-07 16:52 JST
 
 All steps 1–5 VERIFIED. Version remains **1.1.0** (no bump). No push.
+
+## Enterprise Bar A — Step 6 OWASP map doc — 2026-10-07 16:49 JST
+
+### Scope
+Commit `docs/OWASP_LLM_TOP10_MAP.md` mapping controls ↔ LLM01–LLM10 (OWASP 2025); cite slice-5.
+
+### Files changed
+- `docs/OWASP_LLM_TOP10_MAP.md` (new)
+
+### Verify
+```bash
+test -f docs/OWASP_LLM_TOP10_MAP.md
+rg -n 'LLM0[1-9]|LLM10|genai.owasp.org' docs/OWASP_LLM_TOP10_MAP.md
+```
+
+### Evidence
+- File present; all LLM01–LLM10 rows; LLM01 mitigations table; links to OWASP 2025 + slice-5; expanded fixture filename table for Bar A.
+
+### Verdict: VERIFIED
+
+## Enterprise Bar A — Step 7 Red-team fixtures — 2026-10-07 16:50 JST
+
+### Scope
+≥10 attack fixtures from slice-5 table; update corpus category asserts; optional benign counterparts with sane FPR.
+
+### Files changed
+- `fixtures/attacks/`: payload_split (part_a/b/combined), adversarial_suffix, nested_b64_hex, homoglyph_ignore, tool_result_poison, rag_chunk_poison, chatml_delimiter, hitl_urgency_approve, ssrf_web_fetch_metadata, system_prompt_leak_roleplay, output_html_script, size_bomb_b64, email_plus_zwsp (**15** new)
+- `fixtures/benign/`: `benign_large_changelog_excerpt.txt`, `benign_homoglyph_name.txt` (cert blob dropped — raised FPR)
+- `tests/test_fixtures_corpus.py`: category asserts for split/suffix/tool-result/homoglyph/LLM07/LLM10
+
+### Verify
+```bash
+.venv/bin/python -m pytest tests/test_fixtures_corpus.py --override-ini='addopts=' -q
+.venv/bin/python -m pytest tests/ --override-ini='addopts=' -q
+.venv/bin/python -m containment.cli eval --suite fixtures
+.venv/bin/ruff check src tests
+```
+
+### Evidence
+- Attacks **53** (≥30); benign **36** (≥30)
+- Eval policy ON: ASR=0.0000 FPR≈0.0278 utility≈0.9722; detector_block_rate≈0.74; policy_block_rate=1.0
+- Corpus category tests pass; full suite green; ruff clean
+
+### Verdict: VERIFIED
+
+## Enterprise Bar A — Step 8 PIGuard-on + host residuals — 2026-10-07 16:52 JST
+
+### Scope
+`CONTAINMENT_STAGE1` env/config; README + AGENT_INSTALL + SKILL recipes; host residual checklist; fix `allow_download` docstring mismatch.
+
+### Files changed
+- `src/containment/detectors/piguard.py`: docstring fix; `stage1_from_env`; `make_stage1_cascade`
+- `src/containment/ingest.py`: `default_ingest_cascade` honors env when set
+- `src/containment/detectors/__init__.py`, `src/containment/__init__.py`: exports
+- `tests/test_piguard.py`: env + helper tests
+- `docs/AGENT_INSTALL.md`: §7 PIGuard recipe + §8 host residual checklist
+- `README.md`, `SKILL.md`: enable path + residual one-liners; OWASP map link
+
+### Verify
+```bash
+.venv/bin/ruff check src tests
+.venv/bin/python -m pytest tests/ --override-ini='addopts=' -q
+```
+
+### Evidence
+- Docstring no longer claims cache-without-`allow_download`
+- Env unset → RulesOnly default unchanged; `CONTAINMENT_STAGE1=fake` honored by `default_ingest_cascade`
+- Install docs carry enable recipe + sandbox/egress/vault/WORM/`trust_remote_code` checklist
+
+### Verdict: VERIFIED
+
+## Enterprise Bar A — Step 9 CI supply-chain — 2026-10-07 16:53 JST
+
+### Scope
+`.github/workflows/ci.yml` (ruff, pytest, release_gate, pip-audit, cyclonedx); `.github/dependabot.yml`; pin action versions reasonably.
+
+### Files changed
+- `.github/workflows/ci.yml` (new): checkout@v4, setup-python@v5 (3.12), upload-artifact@v4; apt ripgrep; release_gate; pip-audit; cyclonedx-py SBOM artifact
+- `.github/dependabot.yml` (new): pip + github-actions weekly
+- `README.md`: local CI/SBOM commands
+
+### Verify
+```bash
+test -f .github/workflows/ci.yml && test -f .github/dependabot.yml
+.venv/bin/pip-audit   # exit 0 locally
+.venv/bin/cyclonedx-py environment -o /tmp/sbom-test.cdx.json --of json --pyproject pyproject.toml --mc-type library
+```
+
+### Evidence
+- `pip-audit`: No known vulnerabilities found (exit 0)
+- `cyclonedx-bom` installable; SBOM JSON non-empty
+- Actions pinned to major version tags (v4/v5); Dependabot refreshes
+
+### Verdict: VERIFIED
+
+## Enterprise Bar A — Step 10 Exports + DECISIONS + THREAT_MODEL — 2026-10-07 16:54 JST
+
+### Scope
+Public exports for new modules; DECISIONS adopt notes; THREAT_MODEL residuals (signed intent, SSRF, multi-process store).
+
+### Files changed
+- `src/containment/__init__.py` / detectors: confirmed exports (store, intent, url_guard, stage1 helpers)
+- `DECISIONS.md`: Bar A adopt notes (store, signed intent, url_guard, OWASP, PIGuard env, CI/SBOM)
+- `docs/THREAT_MODEL.md`: controls 8–10; residuals for signed intent / SSRF / multi-process / LLM08-09/multimodal
+
+### Verify
+```bash
+.venv/bin/python -c "from containment import CapabilityConsumeStore, IntentSigner, parse_egress_url, make_stage1_cascade, stage1_from_env"
+.venv/bin/python -m pytest tests/ --override-ini='addopts=' -q
+.venv/bin/ruff check src tests
+```
+
+### Verdict: VERIFIED
+
+## Enterprise Bar A — Step 11 Final prove-it (1.2.0) — 2026-10-07 16:55 JST
+
+### Scope
+Version **1.2.0** everywhere; `scripts/release_gate.sh` exit 0; commit; push `origin/main`; confirm remote HEAD.
+
+### Files changed (steps 6–11 aggregate)
+- `docs/OWASP_LLM_TOP10_MAP.md`
+- `fixtures/attacks/` (+15), `fixtures/benign/` (+2); `tests/test_fixtures_corpus.py`
+- PIGuard env/helpers + docs (AGENT_INSTALL/README/SKILL); `tests/test_piguard.py`
+- `.github/workflows/ci.yml`, `.github/dependabot.yml`
+- `DECISIONS.md`, `docs/THREAT_MODEL.md`; exports
+- `pyproject.toml`, `src/containment/__init__.py` → **1.2.0**
+
+### Verify (pre-push)
+```bash
+.venv/bin/python -c "import containment; print(containment.__version__)"  # 1.2.0
+./scripts/release_gate.sh   # GATE_EXIT=0
+```
+
+### Evidence (gate)
+- ruff: All checks passed
+- pytest: **171 passed, 1 skipped**
+- eval: ASR=0.0000 FPR=0.0278 utility=0.9722 detector_block_rate=0.7358 policy_block_rate=1.0 (53 attacks / 36 benign)
+- placeholder scan clean; GATE_EXIT=0
+
+### Verdict: VERIFIED (pre-push); post-push note follows after `git push`

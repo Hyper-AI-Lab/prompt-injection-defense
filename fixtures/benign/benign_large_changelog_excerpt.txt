@@ -1,0 +1,8 @@
+# Changelog excerpt (legitimately long but under size limits)
+## 1.1.0
+- Fixed broker audit hash chain documentation.
+- Added url_guard helpers for public_only checks.
+- Improved moltbook max_bytes handling.
+## 1.0.0
+- Initial production release of containment labels, policy, and broker.
+Operators may paste large changelogs into tickets; that is not an attack.

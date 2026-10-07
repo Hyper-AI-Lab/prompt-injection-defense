@@ -172,3 +172,38 @@ Industry pattern (2026): bind failure posture to control severity — timeouts o
 
 ### Heavy deps decision
 No new packages added to default/`[dev]`. PIGuard and StackOne stay optional extras. Offline CI remains RulesOnly + Stage-0.
+
+---
+
+## 2026-10-07 — Enterprise Bar A adopt notes (1.2.0)
+
+### Capability consume store — **ADOPT**
+- **Protocol** `CapabilityConsumeStore` with **Memory** (default) and **Sqlite** backends.
+- SQLite enables cross-process one-use consume; Memory remains the default for single-process hosts.
+- **Skip:** Redis as a required dependency (out of Bar A).
+
+### Signed IntentEnvelope (HMAC) — **ADOPT**
+- `IntentSigner` / `SignedIntent` bind `task_id`, principal, scope, issued/expiry, `plan_hash`.
+- Broker flags: `require_signed_intent` and `enterprise_profile` verify before mint.
+- **Skip:** Ed25519 as required (optional future); HMAC is the Bar A binding.
+
+### url_guard — **ADOPT**
+- Shared helpers for scheme/userinfo/literal metadata & private IP rejection; wired into policy, broker, and moltbook.
+- Moltbook: no-follow redirects + max read + base_url check.
+- **Residual:** not DNS-rebinding-complete SSRF; host egress proxy still required.
+
+### OWASP map + red-team expansion — **ADOPT**
+- `docs/OWASP_LLM_TOP10_MAP.md` (OWASP LLM Top 10 **2025**).
+- ≥10 surgical attack fixtures from slice-5; corpus category asserts extended.
+
+### PIGuard-on path — **ADOPT (docs + thin env)**
+- `CONTAINMENT_STAGE1` + `CONTAINMENT_PIGUARD_ALLOW_DOWNLOAD`; `make_stage1_cascade` / `stage1_from_env`.
+- Default ingest remains RulesOnly unless env set.
+- Host residual checklist in `docs/AGENT_INSTALL.md` §8.
+
+### CI / SBOM — **ADOPT**
+- `.github/workflows/ci.yml` + `.github/dependabot.yml`; `pip-audit` + CycloneDX (`cyclonedx-bom`) in CI.
+- Local commands documented in README.
+
+### Explicit non-goals (unchanged)
+Full CaMeL/FIDES; Meta PG2 default download; OS sandbox; DNS-rebinding-complete SSRF; Redis required; FedRAMP/SOC2 certification claims.

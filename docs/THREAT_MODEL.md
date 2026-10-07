@@ -38,6 +38,9 @@ is influenced by injected instructions.
 5. **Tool broker** — unknown tools denied; schema check; capability mint one-use; audit append.
 6. **Fail closed** — detector error / missing Stage-1 weights advise deny for privileged sinks.
 7. **Datamarking** — optional spotlighting helpers for trusted instructions vs untrusted data.
+8. **Signed intents (HMAC)** — optional/enterprise: verify `IntentEnvelope` MAC + expiry + `plan_hash` before capability mint (`require_signed_intent` / `enterprise_profile`).
+9. **Capability consume store** — pluggable one-use consume (`MemoryConsumeStore` default; `SqliteConsumeStore` for multi-process).
+10. **url_guard** — shared egress URL parsing: scheme allowlist, userinfo reject, literal metadata/private IP deny; wired into policy/broker/moltbook.
 
 ## Non-goals / residual risk
 
@@ -52,6 +55,22 @@ is influenced by injected instructions.
   cryptographically prevented. This is **not** WORM storage. Treat the chain as tamper-
   *evidence* against casual edits, not as integrity against a privileged filesystem adversary.
   External WORM / signed log shipping remains out of scope for this package.
+- **Signed intent residual:** HMAC binding authenticates envelopes only when the host
+  configures `require_signed_intent` / enterprise profile and protects the signer secret.
+  Unsigned paths remain available for non-enterprise deployments; Ed25519 is not required
+  in 1.2. Compromised signer secrets forge intents — keep secrets in a vault.
+- **SSRF / URL residual:** `url_guard` blocks literal metadata/private IPs, userinfo, and
+  bad schemes; it does **not** perform DNS resolution or defeat DNS rebinding. Hosts must
+  still run an egress proxy / allowlist beyond these helpers. Moltbook disables redirects
+  and caps read size, but third-party sites remain untrusted content sources.
+- **Multi-process capability store residual:** `MemoryConsumeStore` does not synchronize
+  across processes (double-consume possible under multi-worker hosts). Use
+  `SqliteConsumeStore` (or a future external store) when multiple broker processes share
+  mint/verify. SQLite file permissions and locking are host responsibilities; Redis is
+  not a required dependency.
+- **LLM08 / LLM09 / multimodal:** no in-package vector store (LLM08 N/A); misinformation
+  (LLM09) out of authority-path scope; image-embedded injection out of the text fixture
+  corpus — see `docs/OWASP_LLM_TOP10_MAP.md`.
 
 ## Evaluation
 

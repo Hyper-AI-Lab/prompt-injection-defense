@@ -88,3 +88,37 @@ def test_no_notimplemented_in_adapters() -> None:
         src = open(mod.__file__, encoding="utf-8").read()
         for token in banned:
             assert token not in src, f"{mod.__name__} contains {token!r}"
+
+
+def test_stage1_from_env_unset(monkeypatch) -> None:
+    monkeypatch.delenv("CONTAINMENT_STAGE1", raising=False)
+    from containment.detectors.piguard import stage1_from_env
+
+    assert stage1_from_env() is None
+
+
+def test_stage1_from_env_rules_only(monkeypatch) -> None:
+    monkeypatch.setenv("CONTAINMENT_STAGE1", "rules_only")
+    from containment.detectors.piguard import stage1_from_env
+
+    sel = stage1_from_env()
+    assert sel is not None
+    assert sel.backend == "rules_only"
+    assert sel.fail_closed_privileged is True
+
+
+def test_make_stage1_cascade_rules_only() -> None:
+    from containment.detectors.piguard import make_stage1_cascade
+
+    cascade, sel = make_stage1_cascade(prefer="rules_only")
+    assert sel.backend == "rules_only"
+    assert cascade.stage1 is sel.detector
+
+
+def test_default_ingest_honors_env(monkeypatch) -> None:
+    monkeypatch.setenv("CONTAINMENT_STAGE1", "fake")
+    from containment.detectors.piguard import FakeStage1Detector
+    from containment.ingest import default_ingest_cascade
+
+    casc = default_ingest_cascade()
+    assert isinstance(casc.stage1, FakeStage1Detector)
