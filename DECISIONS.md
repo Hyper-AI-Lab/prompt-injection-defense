@@ -121,3 +121,54 @@ AUDIT H4: parsed-then-ignored scaffold. Prefer enforce over strip when possible 
 ### Links
 - Plan: `AUDIT_HARDEN_PLAN.md` step 8
 - Finding: `AUDIT_CODE_FINDINGS.md` H4
+
+---
+
+## 2026-10-07 — Web deep-research spot-check (AUDIT harden step 18)
+
+**Date researched:** 2026-10-07 (JST)
+
+### PIGuard (`leolee99/PIGuard`) — **KEEP optional** (`containment[ml]`)
+
+| Field | Value |
+|-------|-------|
+| Paper | ACL 2025 long — Mitigating Overdefense for Free (MOF) |
+| HF model | https://huggingface.co/leolee99/PIGuard (DeBERTa-v3-base; ~0.2B; renamed from InjecGuard) |
+| Code | https://github.com/leolee99/PIGuard |
+| Demo | https://injecguard.github.io/ |
+| Anthology | https://aclanthology.org/2025.acl-long.1468/ |
+
+**Adopt/skip:** Keep as optional Stage-1 via `select_stage1(prefer="piguard", allow_download=...)`. Still requires `transformers`+weights — **not** default offline CI. No new heavy dep. Existing adapter remains valid; no API break observed in HF deploy snippet (`trust_remote_code=True`, text-classification pipeline).
+
+**Note:** Third-party Rust/ONNX CLI (`misteral/piguard`) exists for ~10ms local inference — interesting for future optional backend, **skip for 1.x** (would add ONNX runtime to default path).
+
+### StackOne Defender — **KEEP optional** (`containment[stackone]`); do not promote to default
+
+| Field | Value |
+|-------|-------|
+| PyPI | `stackone-defender==0.8.2` (Apache-2.0; uploaded 2026-08-19) — https://pypi.org/project/stackone-defender/ |
+| Repo | https://github.com/StackOneHQ/stackone-defender |
+| Product | https://www.stackone.com/platform/prompt-injection-guard/ (page `dateModified` 2026-06-04) |
+| Docs | https://docs.stackone.com/secure/defender |
+| npm | `@stackone/defender` (TS primary; Python aligned) |
+
+**Adopt/skip:** Remains optional Stage-1/tool-result scanner. Wheel with `[onnx]` is ~18MB+ — fine as extra, **breaks offline CI** if made required. Relevant 2026 notes for fail-closed integration:
+- `require_tier2=True` fails closed when ONNX Tier-2 cannot load (else degrades to Tier-1).
+- Tier-3 provider timeout/error is **fail-open** to Tier-2 (cascade) or allow (`tier3_only`) — opposite of our privileged-sink posture; do not mirror Tier-3 fail-open into broker mint.
+- Tool-result scanning complements our ingest cascade; does not replace policy/broker authority.
+
+### Stage-1 timeout → fail-closed — **ADOPT (already step 12)**
+
+Industry pattern (2026): bind failure posture to control severity — timeouts on safety-critical detectors fail closed; advisory checks may fail open.
+
+| Source | URL |
+|--------|-----|
+| Guardrails contract (timeout/unavailability → fail closed for protected ops) | https://github.com/Accelerated-Innovation/governed-ai-delivery/blob/main/extensions/llm-application/docs/backend/architecture/MODEL_GUARDRAILS_CONTRACT.md |
+| Fail-open vs fail-closed by severity + per-detector timeout budget | https://znyx.ai/blog/designing-for-llm-reliability |
+| liteLLM: distinguish `on_error` (timeout) vs `on_fail` (policy) | https://docs.litellm.ai/docs/proxy/guardrails/policy_flow_builder |
+| Guardrail DoS / fail-open vs fail-closed tradeoff | https://arxiv.org/abs/2606.14517 |
+
+**Wire:** `DetectorCascade.stage1_timeout_s` (default 5s) → Stage-1 `label=error` → `privileged_sink_fail_closed` (step 12). No new deps. Aligns with “timeout is a failure; privileged sinks fail closed.”
+
+### Heavy deps decision
+No new packages added to default/`[dev]`. PIGuard and StackOne stay optional extras. Offline CI remains RulesOnly + Stage-0.

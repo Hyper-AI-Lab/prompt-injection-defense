@@ -7,10 +7,11 @@ from dataclasses import dataclass, field
 
 @dataclass(frozen=True, slots=True)
 class IntentEnvelope:
-    """Signed-style task identity and scope (unsigned in v0.1; fields only).
+    """Signed-style task identity and scope (fields only in 1.x; no crypto binding).
 
     Captures who asked for what, under which tenant and risk budget, before
-    any untrusted content is read.
+    any untrusted content is read. Cryptographic intent signing remains out of
+    scope for 1.x — see AUDIT non-goals / DECISIONS.
     """
 
     task_id: str

@@ -91,6 +91,8 @@ class NoOpContextualDetector:
     """Real Stage-2 implementation that always returns inconclusive.
 
     Not a raise stub: safe to wire when no contextual model is configured.
+    Cascade aggregation omits this detector so enabling ``run_stage2`` with
+    the default NoOp does not force aggregate ``inconclusive`` / fail-closed.
     """
 
     def scan_context(

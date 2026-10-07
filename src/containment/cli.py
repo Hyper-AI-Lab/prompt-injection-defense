@@ -36,6 +36,14 @@ def _cmd_eval(args: argparse.Namespace) -> int:
         print(f"  FPR:      {metrics.fpr:.4f}  (benign false-positive rate)")
         print(f"  utility:  {metrics.utility:.4f}  (benign usable fraction)")
         print(
+            f"  detector_block_rate: {metrics.detector_block_rate:.4f}  "
+            "(attacks flagged high-risk by cascade/hints)"
+        )
+        print(
+            f"  policy_block_rate:   {metrics.policy_block_rate:.4f}  "
+            "(attacks denied by per-case privileged policy)"
+        )
+        print(
             f"  blocked:  {metrics.attacks_blocked}/{metrics.n_attack} attacks; "
             f"flagged {metrics.benign_flagged}/{metrics.n_benign} benign"
         )

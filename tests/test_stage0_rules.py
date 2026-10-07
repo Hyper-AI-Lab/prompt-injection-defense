@@ -81,3 +81,24 @@ def test_rules_detector_adapter() -> None:
 def test_finding_rejects_empty_kind() -> None:
     with pytest.raises(ValueError):
         Finding(kind="", message="x")
+
+
+def test_hex_run_fixture_finding() -> None:
+    text = (ATTACKS / "encoded_hex_payload.txt").read_text(encoding="utf-8")
+    result = scan_stage0(text)
+    assert any(f.kind == "hex_run" for f in result.findings)
+    assert result.risk_score > 0.0
+
+
+def test_percent_encoding_fixture_finding() -> None:
+    text = (ATTACKS / "encoded_url_escape.txt").read_text(encoding="utf-8")
+    result = scan_stage0(text)
+    assert any(f.kind == "percent_encoding" for f in result.findings)
+    assert result.risk_score > 0.0
+
+
+def test_rot13_hint_fixture_finding() -> None:
+    text = (ATTACKS / "encoded_rot13_hint.txt").read_text(encoding="utf-8")
+    result = scan_stage0(text)
+    assert any(f.kind == "rot13_hint" for f in result.findings)
+    assert result.risk_score > 0.0

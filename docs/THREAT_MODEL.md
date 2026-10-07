@@ -46,6 +46,12 @@ is influenced by injected instructions.
 - Does not replace OS process isolation, network egress proxies, or secret vaults.
 - Optional HF weights (PIGuard / Prompt Guard 2) may be unavailable; offline mode uses rules + fail-closed privileged path.
 - Live third-party APIs (Moltbook) remain untrusted even when “verified” by the host site.
+- **Audit trail integrity residual (L3):** `AuditLog` is an append-only JSONL file with a
+  best-effort per-event hash chain (`prev_hash` / `event_hash`). Anyone with filesystem
+  write access can truncate, rewrite, or replace the file; truncation/rewrite is not
+  cryptographically prevented. This is **not** WORM storage. Treat the chain as tamper-
+  *evidence* against casual edits, not as integrity against a privileged filesystem adversary.
+  External WORM / signed log shipping remains out of scope for this package.
 
 ## Evaluation
 

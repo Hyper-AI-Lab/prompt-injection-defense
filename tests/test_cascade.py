@@ -156,3 +156,44 @@ def test_risk_signal_findings_round_trip() -> None:
         findings=(finding,),
     )
     assert signal.findings[0].kind == "invisible_char"
+
+
+def test_stage2_noop_does_not_force_inconclusive_aggregate() -> None:
+    """M5: default NoOp Stage-2 must not elevate aggregate / fail-closed."""
+    cascade = DetectorCascade(
+        stage1=FakeStage1(score=0.0, label="benign"),
+        run_stage2=True,
+    )
+    result = cascade.scan("hello world completely benign")
+    assert any(s.detector == "noop_contextual" for s in result.signals)
+    assert result.aggregate_label == "benign"
+    assert result.max_score < 0.4
+    assert privileged_sink_fail_closed("email.send", result) is False
+
+
+def test_stage1_timeout_becomes_error_label() -> None:
+    import time
+
+    class SlowStage1:
+        name = "slow_fake"
+
+        def scan(self, text: str) -> RiskSignal:
+            time.sleep(2.0)
+            return RiskSignal(
+                stage="stage1",
+                score=0.0,
+                label="benign",
+                detector=self.name,
+            )
+
+    cascade = DetectorCascade(
+        stage1=SlowStage1(),  # type: ignore[arg-type]
+        stage1_timeout_s=0.2,
+    )
+    result = cascade.scan("x")
+    assert any(
+        s.stage == "stage1" and s.label == "error" and s.detail.get("error") == "stage1_timeout"
+        for s in result.signals
+    )
+    assert result.aggregate_label == "error"
+    assert privileged_sink_fail_closed("email.send", result) is True

@@ -108,3 +108,39 @@ def test_audit_creates_parent_dirs(tmp_path: Path) -> None:
     log = AuditLog(path)
     assert path.exists()
     assert log.read_all() == []
+
+
+def test_mac_resources_no_comma_join_collision() -> None:
+    """Distinct resource tuples that collide under comma-join must differ."""
+    minter = CapabilityMinter(secret=b"collision-test-secret-key-32bytes!")
+    a = ("a,b", "c")
+    b = ("a", "b,c")
+    assert ",".join(a) == ",".join(b)  # would collide under old encoding
+    t_a = minter.one_use(tool="email.send", resources=a, expiry_seconds=60.0, now=1.0)
+    t_b = minter.one_use(tool="email.send", resources=b, expiry_seconds=60.0, now=1.0)
+    # Same tool/expiry/now but different token_ids; compare MAC payloads via recompute:
+    mac_a = minter._mac("fixed-id", "email.send", a, 61.0)
+    mac_b = minter._mac("fixed-id", "email.send", b, 61.0)
+    assert mac_a != mac_b
+    assert t_a.mac != t_b.mac or t_a.token_id != t_b.token_id
+
+
+def test_audit_hash_chain_links_events(tmp_path: Path) -> None:
+    import json
+
+    from containment.actions import TraceEvent
+    from containment.audit import AuditLog
+
+    log = AuditLog(tmp_path / "chain.jsonl")
+    log.append_event(
+        TraceEvent(event_id="e1", timestamp="t1", kind="k", task_id="t", detail={"n": 1})
+    )
+    log.append_event(
+        TraceEvent(event_id="e2", timestamp="t2", kind="k", task_id="t", detail={"n": 2})
+    )
+    lines = (tmp_path / "chain.jsonl").read_text(encoding="utf-8").splitlines()
+    r0 = json.loads(lines[0])
+    r1 = json.loads(lines[1])
+    assert r0["prev_hash"] == "0" * 64
+    assert r1["prev_hash"] == r0["event_hash"]
+    assert len(r0["event_hash"]) == 64

@@ -51,6 +51,19 @@ _BASE64_BLOB_RE = re.compile(
     r"(?![A-Za-z0-9+/])"
 )
 
+# Long hex runs (discovery only — never decode-execute).
+_HEX_RUN_RE = re.compile(r"(?<![0-9A-Fa-f])(?:[0-9A-Fa-f]{24,})(?![0-9A-Fa-f])")
+
+# Percent-encoding sequences (URL escape discovery).
+_PERCENT_ENC_RE = re.compile(
+    r"%[0-9A-Fa-f]{2}(?:[^%\n]{0,48}%[0-9A-Fa-f]{2})+"
+)
+
+# Explicit rot13 hint markers (discovery only).
+_ROT13_HINT_RE = re.compile(
+    r"(?i)\brot(?:[-_ ]?13)\b\s*[:=]\s*[A-Za-z]{4,}(?:\s+[A-Za-z]{3,})*"
+)
+
 _DEFAULT_MAX_BYTES = 256_000
 
 
@@ -204,6 +217,38 @@ def scan_stage0(
                 )
             )
 
+    # Encoding discovery only — never decode or execute payloads.
+    for match in _HEX_RUN_RE.finditer(original):
+        blob = match.group(0)
+        findings.append(
+            Finding(
+                kind="hex_run",
+                message="hex-looking run discovered",
+                offset=match.start(),
+                detail={"length": len(blob), "preview": blob[:48]},
+            )
+        )
+    for match in _PERCENT_ENC_RE.finditer(original):
+        blob = match.group(0)
+        findings.append(
+            Finding(
+                kind="percent_encoding",
+                message="percent-encoding sequence discovered",
+                offset=match.start(),
+                detail={"length": len(blob), "preview": blob[:64]},
+            )
+        )
+    for match in _ROT13_HINT_RE.finditer(original):
+        blob = match.group(0)
+        findings.append(
+            Finding(
+                kind="rot13_hint",
+                message="rot13 hint pattern discovered",
+                offset=match.start(),
+                detail={"preview": blob[:64]},
+            )
+        )
+
     risk = _score(findings, exceeded=exceeded)
     return Stage0Result(
         original_text=original,
@@ -222,6 +267,9 @@ def _score(findings: list[Finding], *, exceeded: bool) -> float:
         "invisible_char": 0.35,
         "control_char": 0.35,
         "base64_blob": 0.45,
+        "hex_run": 0.4,
+        "percent_encoding": 0.35,
+        "rot13_hint": 0.4,
         "unicode_normalization": 0.1,
         "size_limit": 1.0,
     }

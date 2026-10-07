@@ -33,7 +33,7 @@ rules:
     when:
       task.capabilities_contains: email.send
       args.recipient_in: task.approved_recipients
-      args.body_confidentiality_lte: private
+      input.max_confidentiality_lte: private
     display:
       - resolved_recipient
       - resolved_subject

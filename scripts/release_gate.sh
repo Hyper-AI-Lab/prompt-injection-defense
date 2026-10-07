@@ -21,7 +21,7 @@ pytest
 python -m containment.cli eval --suite fixtures
 
 # Placeholder / unfinished markers must be absent from ship surfaces.
-if rg -n 'TODO|FIXME|NotImplemented|placeholder|TBD' src tests docs README.md SKILL.md; then
+if rg -n 'TODO|FIXME|NotImplemented|pass  #|placeholder|TBD' src tests docs README.md SKILL.md; then
   echo "release_gate: placeholder scan FOUND hits (fail)" >&2
   exit 1
 fi

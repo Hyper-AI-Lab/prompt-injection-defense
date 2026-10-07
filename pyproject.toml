@@ -11,11 +11,6 @@ license = "Apache-2.0"
 requires-python = ">=3.12"
 authors = [{ name = "Kirill Mitrofanov" }]
 keywords = ["prompt-injection", "prompt-injection-defense", "llm-security", "ai-agents", "security", "policy"]
-
-[project.urls]
-Homepage = "https://github.com/Hyper-AI-Lab/prompt-injection-defense"
-Repository = "https://github.com/Hyper-AI-Lab/prompt-injection-defense"
-Issues = "https://github.com/Hyper-AI-Lab/prompt-injection-defense/issues"
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Intended Audience :: Developers",
@@ -29,6 +24,11 @@ dependencies = [
   "pyyaml>=6.0",
   "jsonschema>=4.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Hyper-AI-Lab/prompt-injection-defense"
+Repository = "https://github.com/Hyper-AI-Lab/prompt-injection-defense"
+Issues = "https://github.com/Hyper-AI-Lab/prompt-injection-defense/issues"
 
 [project.scripts]
 containment = "containment.cli:main"

@@ -282,3 +282,46 @@ def test_capability_missing_blocks_fetch(engine: PolicyEngine) -> None:
     decision = engine.evaluate(action, plan=plan)
     assert decision.effect == "deny"
     assert decision.rule_id == "default_deny"
+
+
+def test_input_max_confidentiality_lte_labels_and_args(engine: PolicyEngine) -> None:
+    """input.max_confidentiality_lte uses max(labels, optional args fields)."""
+    plan = _plan()
+    # Labels private + args identity → exceeds private threshold → deny (no match).
+    action = _action(
+        "email.send",
+        {
+            "recipient": "alice@acme.test",
+            "subject": "hi",
+            "body": "x",
+            "body_confidentiality": "identity",
+        },
+        (_trusted(confidentiality="private"),),
+        "s_email",
+    )
+    decision = engine.evaluate(action, plan=plan)
+    assert decision.effect == "deny"
+    assert decision.rule_id == "default_deny"
+
+    # Alias args.body_confidentiality_lte still works on a custom engine.
+    alias_yaml = """
+version: 1
+default: deny
+rules:
+  - id: email-alias
+    effect: require_human
+    tool: email.send
+    when:
+      args.body_confidentiality_lte: private
+      args.recipient_in: task.approved_recipients
+"""
+    alias_engine = PolicyEngine.from_yaml_text(alias_yaml)
+    ok = _action(
+        "email.send",
+        {"recipient": "alice@acme.test", "body": "x"},
+        (_trusted(confidentiality="public"),),
+        "s_email",
+    )
+    d_ok = alias_engine.evaluate(ok, plan=plan)
+    assert d_ok.effect == "require_human"
+    assert d_ok.rule_id == "email-alias"

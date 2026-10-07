@@ -29,7 +29,7 @@ def test_corpus_covers_categories() -> None:
 
 
 def test_offline_eval_runs_and_control() -> None:
-    on, _ = run_eval(fixtures_root=ROOT, policy_enabled=True)
+    on, on_out = run_eval(fixtures_root=ROOT, policy_enabled=True)
     off, _ = run_eval(fixtures_root=ROOT, policy_enabled=False)
     assert on.n_attack >= 30 and on.n_benign >= 30
     assert off.asr > on.asr
@@ -37,3 +37,9 @@ def test_offline_eval_runs_and_control() -> None:
     assert 0.0 <= on.asr <= 1.0
     assert 0.0 <= on.fpr <= 1.0
     assert 0.0 <= on.utility <= 1.0
+    assert 0.0 <= on.detector_block_rate <= 1.0
+    assert 0.0 <= on.policy_block_rate <= 1.0
+    # Honesty: detector rate is not a silent constant identical deny for every attack.
+    det = [o.detector_blocked for o in on_out if o.case.kind == "attack"]
+    assert any(det) and not all(det), "detector_blocked must vary across attacks"
+    assert off.policy_block_rate == 0.0

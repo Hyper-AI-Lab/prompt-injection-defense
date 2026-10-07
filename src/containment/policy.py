@@ -256,15 +256,25 @@ def _predicate(
             return False
         return float(amount) <= float(limit)
 
-    if key == "args.body_confidentiality_lte":
+    if key in ("input.max_confidentiality_lte", "args.body_confidentiality_lte"):
+        # Primary name is input.max_confidentiality_lte (label-based).
+        # args.body_confidentiality_lte is a dual-support alias.
+        # Effective rank = max(label confidentiality, optional args fields
+        # body_confidentiality / confidentiality when present and valid).
         threshold = str(expected)
         if threshold not in _CONF_RANK:
             return False
-        if not action.input_labels:
-            # No labeled inputs: treat as meeting the bound (nothing to leak).
+        ranks: list[int] = [
+            _CONF_RANK[lbl.confidentiality] for lbl in action.input_labels
+        ]
+        for arg_key in ("body_confidentiality", "confidentiality"):
+            raw = action.arguments.get(arg_key)
+            if isinstance(raw, str) and raw in _CONF_RANK:
+                ranks.append(_CONF_RANK[raw])
+        if not ranks:
+            # No labeled inputs and no args confidentiality: nothing to leak.
             return True
-        max_rank = max(_CONF_RANK[lbl.confidentiality] for lbl in action.input_labels)
-        return max_rank <= _CONF_RANK[threshold]
+        return max(ranks) <= _CONF_RANK[threshold]
 
     # Unknown predicates fail closed (do not match).
     return False

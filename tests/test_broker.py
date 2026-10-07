@@ -531,3 +531,61 @@ def test_limits_network_public_only_denies_private_ip(tmp_path: Path) -> None:
         broker.secure_execute(action, plan=plan)
     assert excinfo.value.decision.rule_id == "limits_violation"
     assert "public_only" in excinfo.value.decision.reason
+
+
+def test_schema_rejects_additional_properties(tmp_path: Path) -> None:
+    from containment.tool_schemas import TOOL_ARG_SCHEMAS
+
+    assert TOOL_ARG_SCHEMAS["web.fetch"]["additionalProperties"] is False
+    broker = _broker(tmp_path)
+    # Swap is unnecessary — registry is default.
+    action = ProposedAction(
+        tool="web.fetch",
+        arguments={"url": "https://example.com/", "evil_extra": True},
+        principal="alice",
+        task_id="t1",
+        reason_code="test",
+        input_labels=(_label(),),
+        plan_step="s_fetch",
+    )
+    with pytest.raises(SecurityViolation) as ei:
+        broker.secure_execute(action, plan=_plan())
+    assert ei.value.decision.rule_id == "schema"
+
+
+def test_schema_wallet_requires_amount_destination(tmp_path: Path) -> None:
+    broker = _broker(tmp_path)
+    action = ProposedAction(
+        tool="wallet.transfer",
+        arguments={"destination": "0xabc"},
+        principal="alice",
+        task_id="t1",
+        reason_code="test",
+        input_labels=(_label(),),
+        plan_step="s_wallet",
+    )
+    with pytest.raises(SecurityViolation) as ei:
+        broker.secure_execute(action, plan=_plan())
+    assert ei.value.decision.rule_id == "schema"
+
+
+def test_schema_email_accepts_known_fields(tmp_path: Path) -> None:
+    def approve(action, decision):
+        return ApprovalOutcome(mfa_verified=False)
+
+    broker = _broker(tmp_path, approval=approve)
+    action = ProposedAction(
+        tool="email.send",
+        arguments={
+            "recipient": "alice@acme.test",
+            "subject": "hi",
+            "body": "hello",
+        },
+        principal="alice",
+        task_id="t1",
+        reason_code="test",
+        input_labels=(_label(),),
+        plan_step="s_email",
+    )
+    result = broker.secure_execute(action, plan=_plan())
+    assert result.capability is not None

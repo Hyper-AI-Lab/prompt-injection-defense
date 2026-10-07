@@ -625,3 +625,183 @@ YAML `limits` (max_bytes/redirects/network) were parsed then ignored; enforcing 
 ```
 
 ### Verdict: VERIFIED
+
+## AUDIT Harden Step 9 — Confidentiality predicate honesty (M3) — 2026-10-07 16:14 JST
+
+### Hypothesis
+YAML `args.body_confidentiality_lte` implied an args field but only checked labels; renaming to `input.max_confidentiality_lte` with dual-support alias and documented max(labels, optional args) removes silent wrong-name behavior.
+
+### What changed
+- `policies/default_deny.yaml`: predicate → `input.max_confidentiality_lte: private`
+- `src/containment/policy.py`: honor `input.max_confidentiality_lte` and alias `args.body_confidentiality_lte`; effective rank = max(label confidentiality, optional `body_confidentiality`/`confidentiality` args)
+- `tests/test_policy.py`: args identity elevates past private; alias still matches
+
+### Verify command + output summary
+```bash
+.venv/bin/pytest tests/test_policy.py -q
+# 17 passed
+```
+
+### Verdict: VERIFIED
+
+## AUDIT Harden Step 10 — Stage-2 NoOp aggregate footgun (M5) — 2026-10-07 16:15 JST
+
+### Hypothesis
+Omitting ``noop_contextual`` from severity aggregate / max_score prevents default Stage-2 NoOp from forcing ``inconclusive`` that always fail-closes privileged tools.
+
+### What changed
+- `src/containment/detectors/cascade.py`: `_elevating_signals` skips `noop_contextual`; aggregate + max_score use that set
+- `src/containment/detectors/base.py`: NoOp docstring notes non-elevating aggregate
+- `tests/test_cascade.py`: `test_stage2_noop_does_not_force_inconclusive_aggregate`
+
+### Verify command + output summary
+```bash
+.venv/bin/pytest tests/test_cascade.py -q
+# green
+```
+
+### Verdict: VERIFIED
+
+## AUDIT Harden Step 11 — Stage-0 encoding discovery — 2026-10-07 16:16 JST
+
+### Hypothesis
+Flagging hex runs, percent-encoding, and rot13-hint patterns as Stage-0 discovery findings (no decode-execute) elevates encoded fixtures that previously scored 0.
+
+### What changed
+- `src/containment/detectors/rules.py`: `_HEX_RUN_RE`, `_PERCENT_ENC_RE`, `_ROT13_HINT_RE`; findings `hex_run` / `percent_encoding` / `rot13_hint` with score weights
+- `tests/test_stage0_rules.py`: fixtures `encoded_hex_payload`, `encoded_url_escape`, `encoded_rot13_hint`
+
+### Verify command + output summary
+```bash
+.venv/bin/pytest tests/test_stage0_rules.py -q
+# 12 passed
+```
+
+### Verdict: VERIFIED
+
+## AUDIT Harden Step 12 — Stage-1 timeout → error — 2026-10-07 16:17 JST
+
+### Hypothesis
+Wrapping Stage-1 scan with a bounded timeout and labeling timeout as ``error`` makes the privileged fail-closed path apply under hang conditions.
+
+### What changed
+- `src/containment/detectors/cascade.py`: `stage1_timeout_s` (default 5.0); ThreadPoolExecutor timeout → `label=error` / `error=stage1_timeout`
+- `tests/test_cascade.py`: slow fake detector test
+
+### Verify command + output summary
+```bash
+.venv/bin/pytest tests/test_cascade.py::test_stage1_timeout_becomes_error_label tests/test_piguard.py -q
+# green
+```
+
+### Verdict: VERIFIED
+
+## AUDIT Harden Step 13 — Eval honesty (H5 / M6) — 2026-10-07 16:18 JST
+
+### Hypothesis
+Per-case labels + production-like RulesOnly cascade + separate detector/policy block rates remove the silent constant synthetic deny attribution while keeping --no-policy control.
+
+### What changed
+- `src/containment/eval_runner.py`: `production_like_cascade()`; per-case `_policy_denies_case_egress`; quarantine-aligned instruction hints; `detector_block_rate` / `policy_block_rate` on metrics; Fake only when explicitly passed
+- `src/containment/cli.py`: print both rates
+- `tests/test_cli.py`, `tests/test_fixtures_corpus.py`: assert rates; detector_blocked varies across attacks
+
+### Verify command + output summary
+```bash
+.venv/bin/pytest tests/test_fixtures_corpus.py tests/test_cli.py -q
+# green
+.venv/bin/python -m containment.cli eval --suite fixtures
+# ASR=0.0000 detector_block_rate=0.7632 policy_block_rate=1.0000
+```
+
+### Verdict: VERIFIED
+
+## AUDIT Harden Step 14 — Per-tool argument schema — 2026-10-07 16:19 JST
+
+### Hypothesis
+A closed JSON Schema registry for default-policy tools with ``additionalProperties: false`` catches unknown args before mint; unknown tools remain policy-denied.
+
+### What changed
+- `src/containment/tool_schemas.py`: schemas for `web.fetch`, `email.send`, `http.post`, `wallet.transfer`; `registry_schema_validator`
+- `src/containment/broker.py`: default `schema_validate` → registry validator
+- `tests/test_broker.py`: additionalProperties deny, wallet required fields, email accept
+
+### Verify command + output summary
+```bash
+.venv/bin/pytest tests/test_broker.py -q
+# green
+```
+
+### Verdict: VERIFIED
+
+## AUDIT Harden Step 15 — Capability MAC delimiter (L2) — 2026-10-07 16:20 JST
+
+### Hypothesis
+JSON-array encoding of resources in the MAC payload removes comma-join delimiter collisions.
+
+### What changed
+- `src/containment/capability.py`: `json.dumps(list(resources), ...)` in `_mac`
+- `tests/test_capability_audit.py`: collision case `("a,b","c")` vs `("a","b,c")`
+
+### Verify command + output summary
+```bash
+.venv/bin/pytest tests/test_capability_audit.py -q
+# green
+```
+
+### Verdict: VERIFIED
+
+## AUDIT Harden Step 16 — Audit integrity residual (L3) — 2026-10-07 16:21 JST
+
+### Hypothesis
+Documenting filesystem-writer truncation risk and adding a small prev/event hash chain provides honest residual coverage without claiming WORM.
+
+### What changed
+- `docs/THREAT_MODEL.md`: audit integrity residual (not WORM)
+- `src/containment/audit.py`: `prev_hash` / `event_hash` chain on append
+- `tests/test_capability_audit.py`: chain link test
+
+### Verify command + output summary
+```bash
+.venv/bin/pytest tests/test_capability_audit.py -q
+# green
+```
+
+### Verdict: VERIFIED
+
+## AUDIT Harden Step 17 — Public exports + packaging hygiene — 2026-10-07 16:22 JST
+
+### Hypothesis
+Re-exporting documented helpers, fixing classifiers under `[project]` (not urls), aligning release_gate `pass  #` scan, and updating IntentEnvelope docstring clears L1/scaffold blockers for the gate.
+
+### What changed
+- `src/containment/__init__.py`: export `closed_object_schema`, `ALLOWLIST_SUMMARY_SCHEMA`, `MoltbookError`, `DetectorCascade`, `select_stage1`
+- `pyproject.toml`: classifiers under `[project]`; urls section string-only
+- `scripts/release_gate.sh`: placeholder rg includes `pass  #`
+- `src/containment/plan.py`: IntentEnvelope docstring vs 1.x (no crypto)
+
+### Verify command + output summary
+```bash
+.venv/bin/python -c "import containment; ..."  # smoke OK
+.venv/bin/pip install -e ".[dev]"  # succeeds (classifiers fix)
+.venv/bin/pytest -q && .venv/bin/ruff check src tests
+# green
+```
+
+### Verdict: VERIFIED (gate run follows)
+
+## AUDIT Harden Step 18 — Web deep-research spot-check — 2026-10-07 16:24 JST
+
+### Hypothesis
+Current PIGuard / StackOne / timeout-pattern docs confirm keep-optional extras and validate Stage-1 timeout→error fail-closed without new offline CI deps.
+
+### What changed
+- `DECISIONS.md`: dated adopt/skip notes with URLs for PIGuard, StackOne Defender 0.8.2, Stage-1 timeout fail-closed patterns
+
+### Verify command + output summary
+```bash
+# DECISIONS entry present with URLs + 2026-10-07 date; no new heavy deps in pyproject default
+rg -n "AUDIT harden step 18|stackone-defender==0.8.2|stage1_timeout" DECISIONS.md
+```
+
+### Verdict: VERIFIED

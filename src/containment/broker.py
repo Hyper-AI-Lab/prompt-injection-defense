@@ -16,6 +16,7 @@ from containment.detectors.base import CascadeResult
 from containment.detectors.cascade import PRIVILEGED_SINKS, privileged_sink_fail_closed
 from containment.plan import Plan
 from containment.policy import PolicyEngine
+from containment.tool_schemas import registry_schema_validator
 
 # Privileged / no-tainted-egress tools must carry non-empty input_labels (H1).
 _LABEL_REQUIRED_SINKS: frozenset[str] = PRIVILEGED_SINKS | frozenset({"social.publish"})
@@ -93,7 +94,7 @@ class ToolBroker:
         audit: AuditLog,
         minter: CapabilityMinter,
         *,
-        schema_validate: SchemaValidator = default_schema_validator,
+        schema_validate: SchemaValidator = registry_schema_validator,
         approval: ApprovalHook = default_approval_hook,
         executor: Executor | None = None,
         known_tools: frozenset[str] | None = None,

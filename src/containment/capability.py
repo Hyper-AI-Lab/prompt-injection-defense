@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 import os
 import secrets
 import time
@@ -95,8 +96,10 @@ class CapabilityMinter:
         resources: tuple[str, ...],
         expiry_unix: float,
     ) -> str:
+        # JSON-array encoding avoids comma-join delimiter collisions (L2).
+        resources_enc = json.dumps(list(resources), separators=(",", ":"), ensure_ascii=False)
         payload = "|".join(
-            [token_id, tool, ",".join(resources), f"{expiry_unix:.6f}"]
+            [token_id, tool, resources_enc, f"{expiry_unix:.6f}"]
         ).encode("utf-8")
         digest = hmac.new(self._secret, payload, hashlib.sha256).hexdigest()
         return digest

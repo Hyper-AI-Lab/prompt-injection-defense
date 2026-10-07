@@ -36,6 +36,8 @@ def test_cli_eval_prints_metrics(capsys: pytest.CaptureFixture[str]) -> None:
     assert "ASR:" in out
     assert "FPR:" in out
     assert "utility:" in out
+    assert "detector_block_rate:" in out
+    assert "policy_block_rate:" in out
     assert "policy ON" in out
 
 
@@ -46,6 +48,8 @@ def test_cli_eval_json_and_no_policy(capsys: pytest.CaptureFixture[str]) -> None
     assert data["policy_enabled"] is False
     assert data["asr"] == 1.0
     assert "fpr" in data and "utility" in data
+    assert "detector_block_rate" in data
+    assert data["policy_block_rate"] == 0.0
 
 
 def test_module_and_console_script() -> None:

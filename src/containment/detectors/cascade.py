@@ -14,6 +14,7 @@ not an allow. See ``privileged_sink_fail_closed`` and broker docs.
 
 from __future__ import annotations
 
+import concurrent.futures
 from collections.abc import Mapping
 from typing import Any
 
@@ -75,6 +76,16 @@ class PassthroughStage1:
         )
 
 
+def _elevating_signals(signals: list[RiskSignal]) -> list[RiskSignal]:
+    """Signals that may raise aggregate severity.
+
+    Default Stage-2 ``NoOpContextualDetector`` (detector ``noop_contextual``)
+    is omitted so enabling Stage-2 without a real model does not force
+    aggregate ``inconclusive`` and always fail-close privileged tools (M5).
+    """
+    return [s for s in signals if s.detector != "noop_contextual"]
+
+
 def _aggregate_label(signals: list[RiskSignal]) -> RiskLabel:
     priority = {
         "error": 5,
@@ -85,7 +96,7 @@ def _aggregate_label(signals: list[RiskSignal]) -> RiskLabel:
     }
     best = "benign"
     best_p = 0
-    for signal in signals:
+    for signal in _elevating_signals(signals):
         p = priority[signal.label]
         if p > best_p:
             best = signal.label
@@ -103,11 +114,15 @@ class DetectorCascade:
         stage1: Stage1Detector | None = None,
         stage2: ContextualDetector | None = None,
         run_stage2: bool = False,
+        stage1_timeout_s: float = 5.0,
     ) -> None:
         self.stage0 = stage0 or RulesDetector()
         self.stage1 = stage1 or PassthroughStage1()
         self.stage2 = stage2 if stage2 is not None else NoOpContextualDetector()
         self.run_stage2 = run_stage2
+        if stage1_timeout_s <= 0:
+            raise ValueError("stage1_timeout_s must be positive")
+        self.stage1_timeout_s = float(stage1_timeout_s)
 
     def scan(
         self,
@@ -132,14 +147,30 @@ class DetectorCascade:
         )
 
         # Stage-1 sees normalized text to reduce homoglyph / fullwidth tricks.
+        # Bounded timeout → error label so privileged fail-closed applies.
+        detector_name = getattr(self.stage1, "name", type(self.stage1).__name__)
         try:
-            signal1 = self.stage1.scan(s0.normalized_text)
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                fut = pool.submit(self.stage1.scan, s0.normalized_text)
+                try:
+                    signal1 = fut.result(timeout=self.stage1_timeout_s)
+                except concurrent.futures.TimeoutError:
+                    signal1 = RiskSignal(
+                        stage="stage1",
+                        score=1.0,
+                        label="error",
+                        detector=detector_name,
+                        detail={
+                            "error": "stage1_timeout",
+                            "timeout_s": self.stage1_timeout_s,
+                        },
+                    )
         except Exception as exc:
             signal1 = RiskSignal(
                 stage="stage1",
                 score=1.0,
                 label="error",
-                detector=getattr(self.stage1, "name", type(self.stage1).__name__),
+                detector=detector_name,
                 detail={"error": str(exc)},
             )
         if signal1.stage != "stage1":
@@ -168,9 +199,11 @@ class DetectorCascade:
                 )
             signals.append(signal2)
 
+        elevating = _elevating_signals(signals)
+        max_score = max((s.score for s in elevating), default=0.0)
         return CascadeResult(
             signals=tuple(signals),
-            max_score=max(s.score for s in signals),
+            max_score=max_score,
             aggregate_label=_aggregate_label(signals),
             normalized_text=s0.normalized_text,
             original_sha256=s0.original_sha256,

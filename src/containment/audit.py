@@ -1,7 +1,8 @@
-"""Append-only JSONL audit log."""
+"""Append-only JSONL audit log (best-effort hash chain; not WORM)."""
 
 from __future__ import annotations
 
+import hashlib
 import json
 import threading
 import uuid
@@ -13,9 +14,17 @@ from typing import Any
 
 from containment.actions import PolicyDecision, ProposedAction, TraceEvent
 
+_GENESIS_HASH = "0" * 64
+
 
 class AuditLog:
-    """Thread-safe append-only JSONL writer/reader for TraceEvent records."""
+    """Thread-safe append-only JSONL writer/reader for TraceEvent records.
+
+    Each line may include ``prev_hash`` / ``event_hash`` (SHA-256 over the
+    previous hash + canonical event body). This is tamper-*evidence* only —
+    a filesystem writer can still truncate or replace the file (see
+    ``docs/THREAT_MODEL.md``). Not WORM.
+    """
 
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
@@ -23,22 +32,40 @@ class AuditLog:
         if not self.path.exists():
             self.path.touch()
         self._lock = threading.Lock()
+        self._last_hash = self._load_tip_hash()
+
+    def _load_tip_hash(self) -> str:
+        text = self.path.read_text(encoding="utf-8")
+        last = _GENESIS_HASH
+        for line in text.splitlines():
+            if not line.strip():
+                continue
+            try:
+                raw = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            last = str(raw.get("event_hash") or last)
+        return last
 
     def append_event(self, event: TraceEvent) -> TraceEvent:
-        line = json.dumps(
-            {
-                "event_id": event.event_id,
-                "timestamp": event.timestamp,
-                "kind": event.kind,
-                "task_id": event.task_id,
-                "detail": dict(event.detail),
-            },
-            sort_keys=True,
-            separators=(",", ":"),
-        )
+        body = {
+            "event_id": event.event_id,
+            "timestamp": event.timestamp,
+            "kind": event.kind,
+            "task_id": event.task_id,
+            "detail": dict(event.detail),
+        }
         with self._lock:
+            prev = self._last_hash
+            canonical = json.dumps(body, sort_keys=True, separators=(",", ":"))
+            event_hash = hashlib.sha256(
+                (prev + canonical).encode("utf-8")
+            ).hexdigest()
+            record = {**body, "prev_hash": prev, "event_hash": event_hash}
+            line = json.dumps(record, sort_keys=True, separators=(",", ":"))
             with self.path.open("a", encoding="utf-8") as fh:
                 fh.write(line + "\n")
+            self._last_hash = event_hash
         return event
 
     def append_decision(
