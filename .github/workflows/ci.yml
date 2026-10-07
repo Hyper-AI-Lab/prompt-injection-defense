@@ -1,0 +1,56 @@
+# CI: lint, test, release_gate, pip-audit, CycloneDX SBOM
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      # Pin versions reasonably (Dependabot will refresh github-actions).
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: System deps (ripgrep for release_gate placeholder scan)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ripgrep
+
+      - name: Install package + audit/SBOM tools
+        run: |
+          python -m pip install -U pip
+          python -m pip install -e ".[dev]"
+          python -m pip install pip-audit "cyclonedx-bom>=5"
+
+      - name: Ruff
+        run: ruff check src tests
+
+      - name: Pytest
+        run: pytest
+
+      - name: Release gate
+        run: bash scripts/release_gate.sh
+
+      - name: pip-audit
+        run: pip-audit
+
+      - name: CycloneDX SBOM
+        run: |
+          cyclonedx-py environment -o sbom.cdx.json --of json --pyproject pyproject.toml --mc-type library
+          test -s sbom.cdx.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom-cdx-json
+          path: sbom.cdx.json
+          if-no-files-found: error
