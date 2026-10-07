@@ -204,3 +204,105 @@ def test_plan_factory(tmp_path: Path) -> None:
         )
         == "z"
     )
+
+
+def test_concurrent_calls_do_not_cross_wire_executor(tmp_path: Path) -> None:
+    """C2: shared broker.executor swap must not cross-wire concurrent calls."""
+    import threading
+
+    policy = PolicyEngine.from_yaml_text(
+        """
+version: 1
+default: deny
+rules:
+  - id: allow-a
+    effect: allow
+    tool: tool.a
+    when:
+      principal.authenticated: true
+  - id: allow-b
+    effect: allow
+    tool: tool.b
+    when:
+      principal.authenticated: true
+"""
+    )
+    broker = ToolBroker(
+        policy=policy,
+        audit=AuditLog(tmp_path / "audit-concurrent.jsonl"),
+        minter=CapabilityMinter(secret=b"adapter-registry-concurrent-secret!"),
+        known_tools=frozenset({"tool.a", "tool.b"}),
+    )
+    plan = Plan(
+        task_id="t1",
+        steps=(
+            PlanStep(step_id="sa", tool="tool.a"),
+            PlanStep(step_id="sb", tool="tool.b"),
+        ),
+        capabilities=frozenset({"tool.a", "tool.b"}),
+    )
+    reg = BrokeredRegistry(
+        broker,
+        plan,
+        principal="alice",
+        task_id="t1",
+        reason_code="test",
+        plan_step="sa",
+    )
+
+    barrier = threading.Barrier(2)
+    out_a: list[str] = []
+    out_b: list[str] = []
+    errors: list[BaseException] = []
+
+    def fn_a(**_kwargs: object) -> str:
+        barrier.wait(timeout=5)
+        return "a"
+
+    def fn_b(**_kwargs: object) -> str:
+        barrier.wait(timeout=5)
+        return "b"
+
+    reg.register("tool.a", fn_a, tool="tool.a")
+    reg.register("tool.b", fn_b, tool="tool.b")
+
+    def run_a() -> None:
+        try:
+            out_a.append(
+                reg.call(
+                    "tool.a",
+                    {},
+                    input_labels=(_label(),),
+                    plan_step="sa",
+                )
+            )
+        except BaseException as exc:  # noqa: BLE001 — collect for assert
+            errors.append(exc)
+
+    def run_b() -> None:
+        try:
+            out_b.append(
+                reg.call(
+                    "tool.b",
+                    {},
+                    input_labels=(_label(),),
+                    plan_step="sb",
+                )
+            )
+        except BaseException as exc:  # noqa: BLE001
+            errors.append(exc)
+
+    # Repeat to catch intermittent cross-wire on the old shared-swap path.
+    for _ in range(20):
+        out_a.clear()
+        out_b.clear()
+        errors.clear()
+        t1 = threading.Thread(target=run_a)
+        t2 = threading.Thread(target=run_b)
+        t1.start()
+        t2.start()
+        t1.join(timeout=10)
+        t2.join(timeout=10)
+        assert errors == [], errors
+        assert out_a == ["a"], out_a
+        assert out_b == ["b"], out_b

@@ -169,7 +169,8 @@ def handle_pretool_use(
         return _deny(f"invalid ProposedAction: {exc}")
 
     try:
-        result = broker.secure_execute(action, plan=resolved_plan)
+        # Evaluate-only: PreToolUse must not mint/execute (C3).
+        result = broker.secure_execute(action, plan=resolved_plan, dry_run=True)
     except SecurityViolation as exc:
         decision = exc.decision
         if decision.effect == "require_human":

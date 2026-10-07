@@ -125,6 +125,10 @@ Use matcher `"*"` to cover all tools (unmapped names still deny). Ensure
   user must add settings and env.
 - **User can disable hooks** in Claude Code settings; this is a host-config
   residual, not a library bypass claim.
-- Hook decisions label Claude tool input as `integrity=untrusted`; privileged
-  empty-label fail-closed still applies inside the broker for
-  `PRIVILEGED_SINKS`.
+- Hook decisions label Claude tool input as `integrity=untrusted`. Mapped
+  Claude ids `fs.write` / `fs.read` (and `shell.exec`) are in
+  `PRIVILEGED_SINKS` / `LABEL_REQUIRED_SINKS`, so empty-label fail-closed and
+  detector fail-closed apply the same as `file.write`.
+- PreToolUse uses `secure_execute(..., dry_run=True)`: policy + gates only —
+  no capability mint and no host executor side effects (Claude runs the tool
+  only if the hook returns `allow`).

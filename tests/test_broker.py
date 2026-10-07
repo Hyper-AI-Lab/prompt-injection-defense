@@ -589,3 +589,96 @@ def test_schema_email_accepts_known_fields(tmp_path: Path) -> None:
     )
     result = broker.secure_execute(action, plan=_plan())
     assert result.capability is not None
+
+
+def test_empty_input_labels_fs_write_denied(tmp_path: Path) -> None:
+    """C1: fs.write is label-required (PRIVILEGED_SINKS); empty labels deny."""
+    broker = ToolBroker(
+        policy=PolicyEngine.from_yaml_path(POLICY_PATH),
+        audit=AuditLog(tmp_path / "audit-fs-write-labels.jsonl"),
+        minter=CapabilityMinter(secret=b"broker-fs-write-labels-secret-32b"),
+        known_tools=frozenset({"fs.write"}),
+    )
+    plan = Plan(
+        task_id="t1",
+        steps=(PlanStep(step_id="s_fs", tool="fs.write"),),
+        capabilities=frozenset({"fs.write"}),
+    )
+    action = ProposedAction(
+        tool="fs.write",
+        arguments={"path": "/tmp/x", "content": "hi"},
+        principal="alice",
+        task_id="t1",
+        reason_code="test",
+        input_labels=(),
+        plan_step="s_fs",
+    )
+    with pytest.raises(SecurityViolation) as excinfo:
+        broker.secure_execute(action, plan=plan)
+    assert excinfo.value.decision.rule_id == "empty_input_labels"
+    assert excinfo.value.decision.effect == "deny"
+
+
+def test_fail_closed_privileged_blocks_fs_write(tmp_path: Path) -> None:
+    """C1: fail_closed_privileged applies to fs.write once in PRIVILEGED_SINKS."""
+    policy = PolicyEngine.from_yaml_text(
+        """
+version: 1
+default: deny
+rules:
+  - id: allow-fs-write
+    effect: allow
+    tool: fs.write
+    when:
+      principal.authenticated: true
+"""
+    )
+    broker = ToolBroker(
+        policy=policy,
+        audit=AuditLog(tmp_path / "audit-fs-write-fc.jsonl"),
+        minter=CapabilityMinter(secret=b"broker-fs-write-failclosed-secret!"),
+        known_tools=frozenset({"fs.write"}),
+    )
+    plan = Plan(
+        task_id="t1",
+        steps=(PlanStep(step_id="s_fs", tool="fs.write"),),
+        capabilities=frozenset({"fs.write"}),
+    )
+    action = ProposedAction(
+        tool="fs.write",
+        arguments={"path": "/tmp/x", "content": "hi"},
+        principal="alice",
+        task_id="t1",
+        reason_code="test",
+        input_labels=(_label(),),
+        plan_step="s_fs",
+    )
+    with pytest.raises(SecurityViolation) as excinfo:
+        broker.secure_execute(action, plan=plan, fail_closed_privileged=True)
+    assert excinfo.value.decision.rule_id == "detector_fail_closed"
+
+
+def test_schema_shell_exec_and_fs_write_shapes(tmp_path: Path) -> None:
+    """C4: shell.exec / fs.write schemas reject extras; accept Write and Edit."""
+    from containment.tool_schemas import (
+        TOOL_ARG_SCHEMAS,
+        ToolSchemaError,
+        registry_schema_validator,
+    )
+
+    assert TOOL_ARG_SCHEMAS["shell.exec"]["additionalProperties"] is False
+    assert TOOL_ARG_SCHEMAS["file.write"]["additionalProperties"] is False
+    assert TOOL_ARG_SCHEMAS["fs.read"]["additionalProperties"] is False
+
+    registry_schema_validator("shell.exec", {"command": "id"})
+    with pytest.raises(ToolSchemaError):
+        registry_schema_validator("shell.exec", {"command": "id", "extra": 1})
+
+    registry_schema_validator("fs.write", {"path": "/a", "content": "x"})
+    registry_schema_validator(
+        "fs.write", {"path": "/a", "old_string": "o", "new_string": "n"}
+    )
+    with pytest.raises(ToolSchemaError):
+        registry_schema_validator("fs.write", {"path": "/a", "evil": True})
+    with pytest.raises(ToolSchemaError):
+        registry_schema_validator("fs.read", {})

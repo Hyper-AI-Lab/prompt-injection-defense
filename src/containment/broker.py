@@ -22,7 +22,11 @@ from containment.tool_schemas import registry_schema_validator
 from containment.url_guard import UrlGuardError, check_public_only, check_redirect_args
 
 # Privileged / no-tainted-egress tools must carry non-empty input_labels (H1).
-_LABEL_REQUIRED_SINKS: frozenset[str] = PRIVILEGED_SINKS | frozenset({"social.publish"})
+# Shared with BrokeredRegistry early gate (C5) — keep a single source of truth.
+LABEL_REQUIRED_SINKS: frozenset[str] = PRIVILEGED_SINKS | frozenset({"social.publish"})
+
+# Sentinel: omit per-call executor= to use ToolBroker.executor (C2).
+_EXECUTOR_UNSET: object = object()
 
 
 class SecurityViolation(Exception):
@@ -160,6 +164,8 @@ class ToolBroker:
         cascade: CascadeResult | None = None,
         fail_closed_privileged: bool = False,
         intent: SignedIntent | None = None,
+        executor: Executor | None | object = _EXECUTOR_UNSET,
+        dry_run: bool = False,
     ) -> BrokerResult:
         # 0a) Host gate (enterprise / require_host_gate): fail closed before mint.
         if self.require_host_gate:
@@ -259,7 +265,7 @@ class ToolBroker:
             raise SecurityViolation(str(exc), decision=decision) from exc
 
         # 3) Empty-label fail-closed on privileged / egress sinks (H1).
-        if action.tool in _LABEL_REQUIRED_SINKS and not action.input_labels:
+        if action.tool in LABEL_REQUIRED_SINKS and not action.input_labels:
             decision = PolicyDecision(
                 effect="deny",
                 rule_id="empty_input_labels",
@@ -350,6 +356,17 @@ class ToolBroker:
                 decision=decision,
             )
 
+        # 6b) dry_run (C3): evaluate-only — no approval, mint, or execute.
+        # PreToolUse / ask paths must not side-effect via approving hooks.
+        if dry_run:
+            if decision.effect == "require_human":
+                raise SecurityViolation(
+                    f"human approval required for {action.tool} "
+                    f"(rule {decision.rule_id})",
+                    decision=decision,
+                )
+            return BrokerResult(decision=decision, capability=None, result=None)
+
         # 7) Human approval hook for require_human (+ MFA / display).
         if decision.effect == "require_human":
             outcome = self.approval(action, decision)
@@ -393,10 +410,17 @@ class ToolBroker:
             expiry_seconds=expiry_seconds,
         )
 
+        # Per-call executor overrides instance default without shared mutation (C2).
+        active_executor: Executor | None
+        if executor is _EXECUTOR_UNSET:
+            active_executor = self.executor
+        else:
+            active_executor = executor  # type: ignore[assignment]
+
         result: Any = None
-        if self.executor is not None:
+        if active_executor is not None:
             self.minter.verify(token, tool=action.tool, resources=resources)
-            result = self.executor(action, token)
+            result = active_executor(action, token)
 
         return BrokerResult(decision=decision, capability=token, result=result)
 

@@ -160,7 +160,7 @@ python -m containment.cli eval --suite fixtures --no-policy
 
 ## Package layout
 
-- `src/containment/` — labels, policy, broker, ingest, detectors, quarantine, moltbook, CLI
+- `src/containment/` — labels, policy, broker, ingest, detectors, quarantine, moltbook, adapters (Bar C), reference_host (Bar D), CLI
 - `policies/default_deny.yaml` — default-deny tool policy
 - `fixtures/attacks` / `fixtures/benign` — offline eval corpus
 - `docs/` — threat model, architecture, agent install, host hardening

@@ -9,7 +9,12 @@ from containment.adapters import (
     map_claude_tool,
 )
 from containment.audit import AuditLog
-from containment.broker import BrokerResult, SecurityViolation, ToolBroker
+from containment.broker import (
+    LABEL_REQUIRED_SINKS,
+    BrokerResult,
+    SecurityViolation,
+    ToolBroker,
+)
 from containment.capability import CapabilityError, CapabilityMinter, CapabilityToken
 from containment.capability_store import (
     CapabilityConsumeStore,
@@ -84,13 +89,14 @@ from containment.url_guard import (
     parse_egress_url,
 )
 
-__version__ = "1.5.0"
+__version__ = "1.5.1"
 
 __all__ = [
     "ALLOWLIST_SUMMARY_SCHEMA",
     "AuditLog",
     "AuditShipper",
     "BrokerResult",
+    "LABEL_REQUIRED_SINKS",
     "BrokeredRegistry",
     "brokered_tool",
     "default_claude_plan",

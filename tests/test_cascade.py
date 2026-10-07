@@ -140,6 +140,9 @@ def test_privileged_sink_fail_closed_advisory() -> None:
     # Force inconclusive aggregate via stage1 error path semantics:
     bad = DetectorCascade(stage1=FakeStage1(score=1.0, label="error")).scan("x")
     assert "email.send" in PRIVILEGED_SINKS
+    assert "fs.write" in PRIVILEGED_SINKS
+    assert "fs.read" in PRIVILEGED_SINKS
+    assert "file.write" in PRIVILEGED_SINKS
     assert privileged_sink_fail_closed("email.send", bad) is True
     assert privileged_sink_fail_closed("web.fetch", bad) is False
     # Benign low score: do not fail-closed solely from cascade helper.

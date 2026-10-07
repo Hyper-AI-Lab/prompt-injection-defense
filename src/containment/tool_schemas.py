@@ -75,6 +75,63 @@ TOOL_ARG_SCHEMAS: dict[str, dict[str, Any]] = {
             "memo": {"type": "string"},
         },
     },
+    "shell.exec": {
+        "$id": "tool.shell.exec",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["command"],
+        "properties": {
+            "command": {"type": "string"},
+        },
+    },
+    "file.write": {
+        "$id": "tool.file.write",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["path", "content"],
+        "properties": {
+            "path": {"type": "string", "minLength": 1},
+            "content": {"type": "string"},
+        },
+    },
+    # Write shape (path+content) or Edit shape (path+old_string+new_string).
+    "fs.write": {
+        "$id": "tool.fs.write",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "oneOf": [
+            {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["path", "content"],
+                "properties": {
+                    "path": {"type": "string", "minLength": 1},
+                    "content": {"type": "string"},
+                },
+            },
+            {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["path", "old_string", "new_string"],
+                "properties": {
+                    "path": {"type": "string", "minLength": 1},
+                    "old_string": {"type": "string"},
+                    "new_string": {"type": "string"},
+                },
+            },
+        ],
+    },
+    "fs.read": {
+        "$id": "tool.fs.read",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["path"],
+        "properties": {
+            "path": {"type": "string", "minLength": 1},
+        },
+    },
 }
 
 

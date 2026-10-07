@@ -38,6 +38,8 @@ PRIVILEGED_SINKS: frozenset[str] = frozenset(
         "wallet.transfer",
         "shell.exec",
         "file.write",
+        "fs.write",
+        "fs.read",
     }
 )
 

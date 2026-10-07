@@ -7,9 +7,13 @@ from dataclasses import dataclass
 from typing import Any
 
 from containment.actions import PolicyDecision, ProposedAction
-from containment.broker import BrokerResult, SecurityViolation, ToolBroker
+from containment.broker import (
+    LABEL_REQUIRED_SINKS,
+    BrokerResult,
+    SecurityViolation,
+    ToolBroker,
+)
 from containment.capability import CapabilityToken
-from containment.detectors.cascade import PRIVILEGED_SINKS
 from containment.labels import SecurityLabel
 from containment.plan import Plan
 
@@ -28,8 +32,8 @@ class BrokeredRegistry:
     """Map registry names to callables; every invoke goes through the broker.
 
     There is no public path that runs a registered function without
-    ``ToolBroker.secure_execute``. Unknown names deny. Privileged sinks
-    (``PRIVILEGED_SINKS``) require non-empty ``input_labels`` (H1 spirit).
+    ``ToolBroker.secure_execute``. Unknown names deny. Label-required sinks
+    (``LABEL_REQUIRED_SINKS``) require non-empty ``input_labels`` (H1 spirit).
     """
 
     def __init__(
@@ -120,7 +124,7 @@ class BrokeredRegistry:
             )
             raise SecurityViolation(decision.reason, decision=decision)
 
-        if entry.tool in PRIVILEGED_SINKS and not input_labels:
+        if entry.tool in LABEL_REQUIRED_SINKS and not input_labels:
             decision = PolicyDecision(
                 effect="deny",
                 rule_id="empty_input_labels",
@@ -145,16 +149,14 @@ class BrokeredRegistry:
         def _executor(act: ProposedAction, _token: CapabilityToken) -> Any:
             return entry.fn(**dict(act.arguments))
 
-        prev = self._broker.executor
-        self._broker.executor = _executor
-        try:
-            outcome: BrokerResult = self._broker.secure_execute(
-                action,
-                plan=resolved_plan,
-                **broker_kwargs,
-            )
-        finally:
-            self._broker.executor = prev
+        # Per-call executor — never mutate shared broker.executor (C2).
+        broker_kwargs.pop("executor", None)
+        outcome: BrokerResult = self._broker.secure_execute(
+            action,
+            plan=resolved_plan,
+            executor=_executor,
+            **broker_kwargs,
+        )
         return outcome.result
 
     def _resolve_plan(self) -> Plan:

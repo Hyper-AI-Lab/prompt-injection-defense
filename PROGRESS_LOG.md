@@ -1924,3 +1924,194 @@ Bar D Steps 2–6 complete → version **1.5.0**. release_gate OK. Push `origin/
 - release_gate OK; 287 passed, 2 skipped; ASR=0.0000
 
 ### Verdict: VERIFIED (Bar D complete)
+
+## Bar C+D Audit — Step 1 Baseline — 2026-10-08 00:20 JST
+
+### Scope
+BAR_CD_AUDIT_HARDEN_PLAN.md Step 1 only: gate + pytest + eval + HEAD SHA; no code changes; no version bump; no push; Step 2 not started.
+
+### Repo state
+- HEAD SHA: `933ead21a5e1ce449b4a40c35de2d740cefe955c` (short `933ead2`)
+- Branch: `main` (tracks `origin/main`)
+- Dirty: untracked `BAR_CD_AUDIT_HARDEN_PLAN.md` only (plan artifact; not committed this step)
+- Version: **1.5.0** (`pyproject.toml` + `containment.__version__`)
+
+### release_gate (`scripts/release_gate.sh`)
+- Exit code: **0**
+- ruff: All checks passed
+- pytest: **287 passed, 2 skipped** (~17.20s)
+- eval (`containment.cli eval --suite fixtures`):
+  - attacks: 53; benign: 36
+  - ASR: **0.0000**
+  - FPR: 0.0278
+  - utility: 0.9722
+  - detector_block_rate: 0.7358; policy_block_rate: 1.0000
+  - blocked: 53/53 attacks; flagged 1/36 benign
+- placeholder / TODO / secret / “later steps” scans: clean
+- Final line: `release_gate: OK`
+
+### Notes
+- Gate already covers install + ruff + pytest + eval + placeholder scans; no duplicate pytest/eval run.
+- Matches prior Bar D post-push baseline (287 / ASR 0.0000 at 1.5.0).
+
+### Verdict: VERIFIED
+
+---
+
+## Bar C+D Audit — Step 2 Swarm coverage — 2026-10-08 00:24 JST
+
+### Scope
+Local N=4 swarm slices A–D per `BAR_CD_AUDIT_HARDEN_PLAN.md`; aggregate written.
+
+### Evidence
+- `swarm-reports/bar-cd-audit/slice-A-bar-c-done-predicate.md` — ISSUES (C-A1)
+- `swarm-reports/bar-cd-audit/slice-B-bar-d-done-predicate.md` — PASS
+- `swarm-reports/bar-cd-audit/slice-C-adapters-integrity.md` — ISSUES (C-C1..C-C3 HIGH)
+- `swarm-reports/bar-cd-audit/slice-D-docs-claims.md` — ISSUES (X-D1..D4)
+- `swarm-reports/bar-cd-audit/SWARM_AGGREGATE.md`
+
+### Must-fix (steps 4–7)
+C1 fs.write privilege align; C2 per-call executor; C3 dry_run PreToolUse; C4 schemas; C5 label-set parity; X1–X3 docs.
+
+### Verdict: VERIFIED
+
+---
+
+## Bar C+D Audit — Step 3 Plan-match report — 2026-10-08 00:24 JST
+
+### Scope
+Wrote `AUDIT_PLAN_VS_BAR_CD.md` from swarm aggregate + plans.
+
+### GAP list locked for steps 4–7
+C1–C5 (adapters/broker), X1–X3 (docs). Bar D functional GAPs: none.
+
+### Verdict: VERIFIED
+
+## Bar C+D Audit — Step 4 Fix cluster C — 2026-10-08 00:26 JST
+
+### Scope
+`BAR_CD_AUDIT_HARDEN_PLAN.md` Step 4 only: evidenced ISSUES C1–C5. No Step 5/6/7/8. No version bump. No push. Version remains **1.5.0**.
+
+### Fixes landed
+
+| ID | Sev | Change |
+|----|-----|--------|
+| C2 | HIGH | `ToolBroker.secure_execute(..., executor=_EXECUTOR_UNSET)` per-call; `BrokeredRegistry.call` passes `executor=_executor` (no shared field swap) |
+| C3 | HIGH | `secure_execute(..., dry_run=False)`; dry_run skips approval/mint/execute; `require_human` raises `SecurityViolation`; `handle_pretool_use` always `dry_run=True` |
+| C1 | HIGH | `PRIVILEGED_SINKS` += `fs.write`, `fs.read` (keep `file.write`) |
+| C4 | MED | Schemas: `shell.exec`, `file.write`, `fs.write` (Write+Edit oneOf), `fs.read`; `additionalProperties: false` |
+| C5 | LOW | Public `LABEL_REQUIRED_SINKS` in broker; registry early gate uses same set |
+
+### Files changed
+- `src/containment/broker.py` — LABEL_REQUIRED_SINKS, per-call executor, dry_run
+- `src/containment/adapters/registry.py` — per-call executor; LABEL_REQUIRED_SINKS gate
+- `src/containment/adapters/claude_hook.py` — dry_run=True
+- `src/containment/detectors/cascade.py` — fs.write/fs.read in PRIVILEGED_SINKS
+- `src/containment/tool_schemas.py` — shell.exec / file.write / fs.write / fs.read
+- `tests/test_adapters_registry.py` — concurrent cross-wire proof (20 iterations)
+- `tests/test_adapters_claude_hook.py` — dry_run allow + require_human/ask no-execute
+- `tests/test_broker.py` — fs.write empty labels + fail_closed + schema shapes
+- `tests/test_cascade.py` — assert fs.write/fs.read/file.write in PRIVILEGED_SINKS
+
+### Verify
+- ruff: clean on all touched files
+- pytest (adapters + broker + cascade): **67 passed**
+  - registry 8, claude_hook 10, openai 3, broker 26, broker_host_gate 6, broker_rate_limit 3, cascade 11
+- New proofs green:
+  - `test_concurrent_calls_do_not_cross_wire_executor`
+  - `test_pretool_use_dry_run_allow_does_not_execute`
+  - `test_pretool_use_dry_run_require_human_ask_no_execute`
+  - `test_empty_input_labels_fs_write_denied`
+  - `test_fail_closed_privileged_blocks_fs_write`
+  - `test_schema_shell_exec_and_fs_write_shapes`
+
+### Residuals (accepted; not in C1–C5)
+- C-C6 private `_entries` encapsulation
+- C-C7 unmapped Claude tools deny
+- isolation_declared honor; Claude install≠wired; live Moltbook opt-in
+- X1–X3 docs deferred to Step 6
+- Step 5 Bar D: no functional GAPs (aggregate)
+
+### Verdict: VERIFIED
+
+---
+
+## Bar C+D Audit — Step 5 Fix cluster D — 2026-10-08 00:27 JST
+
+### Scope
+Bar D functional GAPs from swarm aggregate / AUDIT_PLAN_VS_BAR_CD.
+
+### Result
+**No code changes.** Slice B done-predicate 1–5 PASS; soft D-B-S1/S2 are wording only and fold into Step 6 (X cluster) if touched. Reference host scenarios/CLI/enterprise wiring unchanged and still match REFERENCE_HOST_PLAN.
+
+### Verdict: VERIFIED (no-op)
+
+---
+
+## Bar C+D Audit — Step 6 Fix cluster X — 2026-10-08 00:27 JST
+
+### Scope
+Docs/exports/claim drift X1–X3 from swarm aggregate.
+
+### Changes
+- X1: `docs/ARCHITECTURE.md` modules table adds `adapters`, `reference_host`, `enterprise`/`host`
+- X2: `README.md` package layout mentions adapters (Bar C) + reference_host (Bar D)
+- X3: `docs/REFERENCE_HOST.md` Policy packaging residual (`no --policy` vs Claude hook)
+- Bonus: `docs/RUNTIME_ADAPTER.md` residuals updated for C1 (fs.* in PRIVILEGED_SINKS) + C3 (dry_run)
+
+### Verdict: VERIFIED
+
+
+## Bar C+D Audit — Step 7 Integrity + regression — 2026-10-08 00:31 JST
+
+### Scope
+`BAR_CD_AUDIT_HARDEN_PLAN.md` Step 7: placeholder scan, exports, full pytest/ruff, soft C-A3 Edit/Read map, AUDIT post-fix status.
+
+### Actions
+1. Placeholder/TODO/FIXME/NotImplemented scan under adapters, reference_host, broker, tool_schemas: **clean**
+2. Exports: `LABEL_REQUIRED_SINKS` added to `src/containment/__init__.py` (`from containment import LABEL_REQUIRED_SINKS`); `BrokeredRegistry` / `brokered_tool` / `dry_run` on `secure_execute` confirmed
+3. Soft C-A3: `test_map_bash_and_write` extended with Edit→`fs.write` and Read→`fs.read` assertions
+4. `AUDIT_PLAN_VS_BAR_CD.md` appended **Post-fix status** (C1–C5 / X1–X3 CLEARED); history untouched
+5. ruff: clean on changed surfaces
+6. pytest: **293 passed**, 2 skipped (live Redis / live Moltbook)
+
+### Verdict: VERIFIED
+
+
+## Bar C+D Audit — Step 8 Final prove-it (pre-gate) — 2026-10-08 00:31 JST
+
+### Scope
+Version bump **1.5.0 → 1.5.1** (behavior fixes C1–C5); run `scripts/release_gate.sh`; smoke reference-host + Claude deny; commit + push.
+
+### Pre-gate
+- `pyproject.toml` version = 1.5.1
+- `src/containment/__init__.py` `__version__` = 1.5.1
+- Step 7 VERIFIED (293 passed / ruff clean / placeholders clean)
+
+### Running
+`scripts/release_gate.sh` …
+
+
+## Bar C+D Audit — Step 8 Final prove-it (gate + pre-push) — 2026-10-08 00:31 JST
+
+### Scope
+Prove-it for **containment 1.5.1** after Bar C+D audit harden (C1–C5 + X1–X3 + Step 7 integrity).
+
+### Gate evidence
+- `scripts/release_gate.sh` → **exit 0** / `release_gate: OK`
+- pytest: **293 passed**, 2 skipped
+- eval fixtures: attacks 53 / benign 36; **ASR 0.0000**; FPR 0.0278; utility 0.9722; detector_block_rate 0.7358; policy_block_rate 1.0000; blocked 53/53
+- placeholder scans: clean
+- Smoke: `containment-reference-host --scenario all` → **OK** (attack deny / benign allow / human require_human→approve)
+- Smoke: Claude PreToolUse Bash `rm -rf /` → **deny**
+
+### Commit contents (this release)
+- Code: broker dry_run + per-call executor; PRIVILEGED_SINKS fs.*; schemas; registry; claude_hook; LABEL_REQUIRED_SINKS export
+- Tests: concurrent cross-wire, dry_run PreToolUse, fs.write labels, Edit/Read map
+- Docs: ARCHITECTURE / README / REFERENCE_HOST / RUNTIME_ADAPTER
+- Audit artifacts: `BAR_CD_AUDIT_HARDEN_PLAN.md`, `AUDIT_PLAN_VS_BAR_CD.md`, `swarm-reports/bar-cd-audit/`, PROGRESS_LOG
+
+### Accepted residuals
+C-C6 private `_entries`; C-C7 unmapped deny; `isolation_declared` honor; Claude install≠wired; live Moltbook opt-in; reference-host no `--policy` (documented).
+
+### Verdict: VERIFIED (pre-push; push next)
