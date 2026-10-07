@@ -1752,3 +1752,12 @@ Bar C Steps 2–5 complete → version **1.4.0**. release_gate OK. Push `origin/
 - `fs.write`/`fs.read` not in `PRIVILEGED_SINKS`; default-deny still denies
 
 ### Verdict: VERIFIED (pre-push; gate run next)
+
+## Runtime Adapter (Bar C) — Step 6 post-push — 2026-10-07 22:59 JST
+
+### Push evidence
+- `origin/main` HEAD: `dafa58b`
+- Version: **1.4.0**
+- release_gate OK; 277 passed, 2 skipped; ASR=0.0000 FPR=0.0278
+
+### Verdict: VERIFIED (Bar C complete)
