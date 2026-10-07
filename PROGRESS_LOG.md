@@ -1167,3 +1167,329 @@ Version **1.2.0** everywhere; `scripts/release_gate.sh` exit 0; commit; push `or
 - Dependabot + all other Bar A 6–11 content **is** on remote at `a78b085`.
 
 ### Verdict: VERIFIED (code 1.2.0 on origin/main); CI workflow file pending `workflow` scope
+
+## Leftovers Bar B — Plan locked — 2026-10-07 21:56 JST
+
+### Scope
+K approved Bar B + in-repo Python egress proxy (resolve-pin-forward). Plan written as law: `LEFTOVERS_HARDEN_PLAN.md` (11 steps → 1.3.0).
+
+### Baseline (pre-swarm, pre-code)
+- version: 1.2.0
+- `origin/main` HEAD: `0c17a98`
+- release_gate: OK
+- pytest: 171 passed, 1 skipped
+- eval: ASR=0.0000 FPR=0.0278 utility=0.9722 detector_block_rate=0.7358 policy_block_rate=1.0000
+
+### Verdict: VERIFIED (plan + baseline only; no product code yet)
+
+## Leftovers Bar B — Swarm aggregate — 2026-10-07 21:58 JST
+
+### Scope
+Local swarm N=4 coverage of Bar B gaps vs 1.2.0 / LEFTOVERS_HARDEN_PLAN.md.
+
+### Evidence
+- slice-01 ISSUES (host/secrets absent)
+- slice-02 ISSUES (no DNS pin/proxy; CGNAT hole)
+- slice-03 PASS (Ed25519/Redis/rate fit)
+- slice-04 PASS (coherence / claim boundaries)
+- Aggregate: `swarm-reports/leftovers/SWARM_AGGREGATE.md`
+
+### Verdict: VERIFIED (swarm complete; plan law unchanged; begin step 2)
+
+## Leftovers Bar B — Step 2 Host foundation — 2026-10-07 21:59 JST
+
+### Scope
+LEFTOVERS_HARDEN_PLAN.md step 2 only: `containment.host` SecretProvider (Env/File), HostChecklist, AuditShipper + FileAuditShipper, RateLimitGate + TokenBucketRateLimit; unit tests. No broker HostGate, no egress_resolve, no version bump.
+
+### Files changed
+- `src/containment/host/__init__.py` (new)
+- `src/containment/host/secrets.py` (new)
+- `src/containment/host/checklist.py` (new)
+- `src/containment/host/audit_ship.py` (new)
+- `src/containment/host/rate_limit.py` (new)
+- `tests/test_host_foundation.py` (new)
+
+### Verify
+- `.venv/bin/ruff check src/containment/host tests/test_host_foundation.py` → All checks passed
+- `.venv/bin/pytest tests/test_host_foundation.py -q` → **13 passed**
+- `.venv/bin/pytest -q` → **184 passed, 1 skipped** (was 171 passed, 1 skipped at baseline)
+- `containment.__version__` still **1.2.0** (no bump)
+
+### Notes
+- `HostChecklist.egress_configured` is bool for now; steps 3/5 set true when proxy/provider present.
+- Top-level `containment.__init__` exports deferred to step 10 (composition/docs).
+- No commit (not asked).
+
+### Verdict: VERIFIED
+
+## Leftovers Bar B — Step 3 Broker HostGate — 2026-10-07 22:01 JST
+
+### Scope
+LEFTOVERS_HARDEN_PLAN.md step 3 only: `require_host_gate` / enterprise profile wiring; fail-closed before mint; tests. No version bump. No rate_limit enforcement. No steps 4–11.
+
+### Files changed
+- `src/containment/broker.py` — `require_host_gate`, `host_checklist`; enterprise implies host gate; gate 0a before signed intent
+- `tests/test_broker_host_gate.py` (new) — 4 cases
+- `tests/test_intent.py` — enterprise allow path supplies complete `HostChecklist`
+
+### Verify
+- `.venv/bin/ruff check src/containment/broker.py tests/test_broker_host_gate.py` → All checks passed
+- `.venv/bin/pytest tests/test_broker_host_gate.py -q` → **4 passed**
+- `.venv/bin/pytest -q` → **188 passed, 1 skipped** (was 184 passed, 1 skipped after step 2)
+- `containment.__version__` still **1.2.0** (no bump)
+
+### Notes
+- Host gate runs as step 0a (before signed-intent gate): missing checklist → `host_gate_required`; incomplete → `host_checklist_failed` with `failures()` codes in reason.
+- `require_host_gate=False` leaves prior broker behavior unchanged.
+- No rate_limit ctor wiring this step (deferred to step 9).
+- No commit (not asked).
+
+### Verdict: VERIFIED
+
+## Leftovers Bar B — Step 4 egress_resolve + pin — 2026-10-07 22:03 JST
+
+### Scope
+LEFTOVERS_HARDEN_PLAN.md step 4 only: egress_resolve module + pinned connect helpers; shared deny CIDR table incl CGNAT; url_guard.is_blocked_ip_literal routes through ip_is_denied. No egress_proxy (step 5), no moltbook wire (step 6), no version bump, no docs rewrite.
+
+### Files changed
+- `src/containment/egress_resolve.py` (new)
+- `src/containment/url_guard.py` — is_blocked_ip_literal uses egress_resolve.ip_is_denied
+- `tests/test_egress_resolve.py` (new) — 17 hermetic cases
+- `tests/test_url_guard.py` — test_cgnat_literal_blocked
+
+### Verify
+- `.venv/bin/ruff check src/containment/egress_resolve.py src/containment/url_guard.py tests/test_egress_resolve.py` → All checks passed
+- `.venv/bin/pytest tests/test_egress_resolve.py tests/test_url_guard.py` → **26 passed**
+- `.venv/bin/pytest` → **206 passed, 1 skipped** (was 188 passed, 1 skipped after step 3)
+- `containment.__version__` still **1.2.0** (no bump)
+
+### Notes
+- DENY_NETWORKS includes 100.64.0.0/10 CGNAT (Python is_private is False for these).
+- resolve_and_pin denies if any DNS answer is blocked (mixed public+private → deny).
+- pinned_socket_connect dials pinned_ip only; injectable resolver/connector for hermetic tests.
+- Residual vs full host proxy documented by plan non-goals; step 5 adds daemon.
+- No commit (not asked).
+
+### Verdict: VERIFIED
+
+## Leftovers Bar B — Step 5 egress_proxy daemon — 2026-10-07 22:06 JST
+
+### Scope
+LEFTOVERS_HARDEN_PLAN.md step 5 only: HTTP forward proxy resolve-pin-forward; CLI entrypoint; hermetic tests (deny private/IMDS/CGNAT; allow mock public via connector redirect). Reuses step-4 egress_resolve. No moltbook wire, Ed25519, Redis, docs, or version bump.
+
+### Files changed
+- `src/containment/egress_proxy.py` (new) — ProxyConfig, EgressProxyServer, main
+- `tests/test_egress_proxy.py` (new) — 9 hermetic cases
+- `pyproject.toml` — script `containment-egress-proxy = containment.egress_proxy:main`
+
+### Behavior
+- CONNECT: resolve_and_pin(https://host:port/) → pin connect → 200 Connection Established → select tunnel (no TLS MITM)
+- Absolute-URI HTTP forward: resolve_and_pin → pin connect → relative request with Host=original hostname; no redirect following
+- Deny → HTTP 403 with reason/code; injectable resolver= and connector= for tests
+- CLI: `--listen HOST:PORT`, repeatable `--allow-host`, `--timeout`
+
+### Verify
+- `.venv/bin/pip install -e ".[dev]" -q` → ok
+- `.venv/bin/ruff check src/containment/egress_proxy.py tests/test_egress_proxy.py` → All checks passed
+- `.venv/bin/pytest tests/test_egress_proxy.py -q` → **9 passed**
+- `.venv/bin/pytest -q` → **215 passed, 1 skipped** (was 206 passed, 1 skipped after step 4; +9)
+- `python -m containment.egress_proxy --help` → usage ok
+- `containment.__version__` still **1.2.0** (no bump)
+
+### Notes
+- Allow-path tests redirect connector from mock public IP to local BaseHTTPServer (HTTP/1.0 responses; assertions check status 200 + body).
+- No real IMDS or public network contact.
+- No commit (not asked).
+
+### Verdict: VERIFIED
+
+## Leftovers Bar B — Step 6 wire fetch paths — 2026-10-07 22:09 JST
+
+### Scope
+LEFTOVERS_HARDEN_PLAN.md step 6 only: `http_egress.fetch_url` helper; moltbook prefers pinned client or proxy when enterprise/env set; hermetic tests. No Ed25519/Redis/rate/docs/version bump.
+
+### Files changed
+- `src/containment/http_egress.py` (new) — `fetch_url`, `HttpEgressError`; opener > proxy > pinned > default urllib; no redirects
+- `src/containment/moltbook.py` — kwargs `use_pinned_egress`, `proxy_url`, `resolver`, `connector`; env `CONTAINMENT_EGRESS_PINNED` / `CONTAINMENT_EGRESS_PROXY`; wires `fetch_url` when opener unset
+- `tests/test_http_egress.py` (new) — pinned local server, IMDS deny, proxy via EgressProxyServer, opener-wins
+- `tests/test_moltbook.py` — pinned path (resolver+connector+patched open_pinned for plain HTTP), env pinned/proxy, read_posts passthrough
+
+### Behavior
+- Default / explicit `opener`: unchanged (existing mocked tests green)
+- `use_pinned_egress=True` or `CONTAINMENT_EGRESS_PINNED=1`: resolve_and_pin + open_pinned_urllib
+- `proxy_url` or `CONTAINMENT_EGRESS_PROXY`: urllib ProxyHandler (proxy wins over pin when both set)
+- Allowlist + https + public_only checks retained before fetch
+
+### Verify
+- `.venv/bin/ruff check src/containment/moltbook.py src/containment/egress_resolve.py tests/` → All checks passed
+- `.venv/bin/ruff check src/containment/http_egress.py` → All checks passed
+- `.venv/bin/pytest tests/test_moltbook.py tests/test_egress_resolve.py -q` → green (16 passed + 1 skipped moltbook; 17 egress_resolve)
+- `.venv/bin/pytest tests/test_http_egress.py` → **4 passed**
+- `.venv/bin/pytest` → **223 passed, 1 skipped** (was 215 passed, 1 skipped after step 5; +8)
+- `containment.__version__` still **1.2.0** (no bump)
+
+### Notes
+- Moltbook pinned e2e uses connector redirect to local HTTP origin; open_pinned_urllib monkeypatched to plain HTTP because production moltbook URLs are https (TLS to a plain test origin would fail).
+- No commit (not asked).
+
+### Verdict: VERIFIED
+
+## Leftovers Bar B — Step 7 Ed25519 intents — 2026-10-07 22:13 JST
+
+### Scope
+LEFTOVERS_HARDEN_PLAN.md step 7 only: optional Ed25519 intent signer/verify alongside HMAC; broker accepts either via IntentVerifier Protocol; tests. No Redis (8), rate (9), docs (10), or version bump (11).
+
+### Files changed
+- `src/containment/intent.py` — `intent_payload_bytes` shared helper; `_check_intent_time` / `_check_intent_plan_binding`; `IntentVerifier` Protocol; `Ed25519IntentSigner` (alg=`ed25519`, lazy cryptography, public-only verify); HMAC `IntentSigner` behavior preserved (time before MAC, same errors)
+- `src/containment/broker.py` — `intent_signer: IntentVerifier | None`
+- `src/containment/__init__.py` — export `Ed25519IntentSigner`, `IntentVerifier`, `intent_payload_bytes`
+- `pyproject.toml` — optional-dependencies `crypto = ["cryptography>=42"]`; also add `cryptography>=42` to `[dev]` for CI/box green
+- `tests/test_intent_ed25519.py` (new) — round-trip, tamper, cross-alg reject, broker allow/deny, public-only cannot sign, missing-crypto IntentError, payload stability; `pytest.importorskip("cryptography")`
+
+### Behavior
+- Core install still has no cryptography dependency
+- `pip install "containment[crypto]"` or `.[dev,crypto]` enables Ed25519
+- Broker runtime only calls `.verify(...)`; HMAC and Ed25519 both work when configured
+- Cross-alg verify fails closed
+
+### Verify
+- `.venv/bin/pip install -e ".[dev,crypto]" -q`
+- `.venv/bin/ruff check src/containment/intent.py src/containment/broker.py tests/` → All checks passed
+- `.venv/bin/pytest tests/test_intent.py tests/test_intent_ed25519.py` → **18 passed**
+- `.venv/bin/pytest` → **233 passed, 1 skipped** (was 223 passed, 1 skipped after step 6; +10)
+- `containment.__version__` still **1.2.0** (no bump)
+
+### Notes
+- No commit (not asked).
+- Capability tokens remain HMAC-only (out of step-7 scope per swarm slice-03).
+
+### Verdict: VERIFIED
+
+## Leftovers Bar B — Step 8 Redis consume store — 2026-10-07 22:14 JST
+
+### Scope
+LEFTOVERS_HARDEN_PLAN.md step 8 only: optional `[redis]` extra + `RedisConsumeStore`; unit tests with injectable fake client (no redis package required); live test skips unless `CONTAINMENT_LIVE_REDIS=1`. No rate (9), docs (10), or version bump (11).
+
+### Files changed
+- `src/containment/capability_store_redis.py` (new) — `CapabilityStoreError`, `RedisConsumeStore` (`SET key NX EX ttl`); lazy redis import only for `url=`; inject `client=` for tests
+- `pyproject.toml` — optional-dependencies `redis = ["redis>=5"]` (not in default or `[dev]`)
+- `src/containment/__init__.py` — export `RedisConsumeStore`, `CapabilityStoreError` (module import stays redis-free)
+- `tests/test_capability_store_redis.py` (new) — fake-client unit path; outage fail-closed; minter wire; live skip gate
+
+### Behavior
+- First `SET NX` wins → True; key exists → False
+- TTL = `max(1, ceil(expiry_unix - now))`; `now=` injectable for tests
+- Redis connection/op errors → raise `CapabilityStoreError` (fail closed; not confused with already-used)
+- Memory/Sqlite unchanged; Protocol surface identical (`try_consume` → bool)
+
+### Verify
+- `.venv/bin/pip install -e ".[dev]" -q`
+- `.venv/bin/ruff check src/containment/capability_store_redis.py tests/test_capability_store_redis.py` → All checks passed
+- `.venv/bin/pytest tests/test_capability_store_redis.py tests/test_capability_store.py` → **13 passed, 1 skipped** (live Redis gated)
+- `.venv/bin/pytest` → **241 passed, 2 skipped** (was 233 passed, 1 skipped after step 7; +8)
+- `containment.__version__` still **1.2.0** (no bump)
+
+### Notes
+- No commit (not asked).
+- Live Redis: set `CONTAINMENT_LIVE_REDIS=1` and optional `REDIS_URL` / `CONTAINMENT_REDIS_URL`.
+
+### Verdict: VERIFIED
+
+## Leftovers Bar B — Step 9 Rate/spend on broker — 2026-10-07 22:16 JST
+
+### Scope
+LEFTOVERS_HARDEN_PLAN.md step 9 only: enforce `RateLimitGate` on `ToolBroker` when configured (privileged sinks only); tests. No docs (10) or version bump (11).
+
+### Files changed
+- `src/containment/broker.py` — `rate_limit: RateLimitGate | None = None` on `__init__` (optional; not auto-enabled by enterprise_profile); before capability mint, if gate set and tool in `PRIVILEGED_SINKS` and `allow(..., cost=1.0)` is False → deny `rate_limit_exceeded`, audit, `SecurityViolation`
+- `tests/test_broker_rate_limit.py` (new) — capacity=1 first allow / second deny; no gate unchanged; non-privileged `web.fetch` not rate-limited after budget exhausted
+
+### Behavior
+- Rate gate runs after policy / human approval / MFA, immediately before mint
+- Only `PRIVILEGED_SINKS` (`email.send`, `http.post`, `wallet.transfer`, `shell.exec`, `file.write`) are charged
+- Unconfigured `rate_limit=None` → prior behavior
+
+### Verify
+- `.venv/bin/ruff check src/containment/broker.py tests/test_broker_rate_limit.py` → All checks passed
+- `.venv/bin/pytest tests/test_broker_rate_limit.py` → **3 passed**
+- `.venv/bin/pytest` → **244 passed, 2 skipped** (was 241 passed, 2 skipped after step 8; +3)
+- `containment.__version__` still **1.2.0** (no bump)
+
+### Notes
+- No commit (not asked).
+
+### Verdict: VERIFIED
+
+## Leftovers Bar B — Step 10 Docs + composition — 2026-10-07 22:20 JST
+
+### Scope
+LEFTOVERS_HARDEN_PLAN.md step 10 only: `build_enterprise_host()`; `docs/HOST_HARDENING.md`; update AGENT_INSTALL / THREAT_MODEL / DECISIONS / README / SKILL / exports. No version bump (step 11).
+
+### Files changed
+- `src/containment/enterprise.py` (new) — `EnterpriseHost` frozen dataclass; `build_enterprise_host(...)` wires policy, AuditLog, FileAuditShipper, SecretProvider (env|file|injected), HostChecklist, CapabilityMinter, IntentSigner (or injected IntentVerifier), ToolBroker(`enterprise_profile=True`), optional rate_limit + proxy_url hint; ValueError if isolation/egress incomplete or checklist not ok; no hardcoded production secrets
+- `docs/HOST_HARDENING.md` (new) — library vs host; proxy CLI; HostGate; SecretProvider; AuditShipper; pinned egress env; Ed25519/Redis/rate; explicit residuals (no FedRAMP claim; proxy not iron-proxy MITM)
+- `docs/AGENT_INSTALL.md` — SecretProvider / `build_enterprise_host` examples; §8 points at HOST_HARDENING + HostGate
+- `docs/THREAT_MODEL.md` — controls 8–12 updated; residuals note in-package interfaces + skip residual
+- `DECISIONS.md` — append Bar B adopt notes
+- `README.md` — Bar B blurb + HOST_HARDENING link; plaintext `secret=b"..."` removed
+- `SKILL.md` — host-gate / pinned egress / HOST_HARDENING refs
+- `src/containment/__init__.py` — export `build_enterprise_host`, `EnterpriseHost`, host + egress symbols
+- `tests/test_enterprise_compose.py` (new) — 7 tests
+
+### Behavior
+- Caller must `isolation_declared=True` and `egress_configured=True` (or non-empty `proxy_url`)
+- Exactly one of `secret_provider` / `secrets_dir` / `secrets_env_prefix`
+- Broker: `require_host_gate` and `require_signed_intent` True via enterprise_profile
+- Version remains **1.2.0**
+
+### Verify
+- `.venv/bin/ruff check src/containment/enterprise.py src/containment/__init__.py tests/test_enterprise_compose.py` → All checks passed
+- `.venv/bin/pytest tests/test_enterprise_compose.py -q` → **7 passed**
+- `.venv/bin/pytest -q` → **251 passed, 2 skipped** (was 244 passed, 2 skipped after step 9; +7)
+- `rg FedRAMP|TODO|NotImplemented|pass  #` on HOST_HARDENING/enterprise: FedRAMP only as explicit negation; no TODO/NotImplemented/placeholders
+- `containment.__version__` still **1.2.0**
+- No plaintext `secret=b"` in README / AGENT_INSTALL
+
+### Notes
+- No commit (not asked).
+- Step 11 (microbench, 1.3.0 bump, release_gate, push) not started.
+
+### Verdict: VERIFIED
+
+## Leftovers Bar B — Step 11 Final prove-it — 2026-10-07 22:22 JST
+
+### Scope
+LEFTOVERS_HARDEN_PLAN.md step 11: microbench script; version **1.3.0**; release_gate exit 0; prepare commit. **No push** (parent pushes after review).
+
+### Files changed
+- `scripts/microbench_host.py` (new) — wall time for `resolve_and_pin` (injected public resolver), `HostChecklist.ok()`, `TokenBucketRateLimit.allow`; mean/p50/p95 ms via `time.perf_counter`; no LLM
+- `pyproject.toml` — version `1.3.0`
+- `src/containment/__init__.py` — `__version__ = "1.3.0"`
+- `DECISIONS.md` — Bar B 1.3.0 prove-it note
+- `PROGRESS_LOG.md` — this entry
+
+### Microbench (n=2000)
+```
+microbench_host n=2000 (perf_counter; injected resolver; no LLM)
+resolve_and_pin: n=2000 mean_ms=0.0163 p50_ms=0.0153 p95_ms=0.0208
+HostChecklist.ok: n=2000 mean_ms=0.0001 p50_ms=0.0001 p95_ms=0.0002
+TokenBucketRateLimit.allow: n=2000 mean_ms=0.0006 p50_ms=0.0006 p95_ms=0.0006
+```
+Limiter: CPU / Python call overhead (stdlib clock); not network or model latency.
+
+### release_gate
+- ruff: All checks passed
+- pytest: **251 passed, 2 skipped** in 12.91s
+- eval fixtures: attacks=53, benign=36; **ASR=0.0000**, **FPR=0.0278**, utility=0.9722; detector_block_rate=0.7358; policy_block_rate=1.0000; blocked 53/53 attacks; flagged 1/36 benign
+- placeholder scan: clean
+- exit 0
+
+### Version
+- `containment.__version__` == **1.3.0**
+- wheel built as `containment-1.3.0`
+
+### Notes
+- Commit prepared on `main`; **push deferred to parent**.
+- Done predicate items 1–12 satisfied locally except `origin/main` push (parent).
+
+### Verdict: VERIFIED (local; push pending parent)

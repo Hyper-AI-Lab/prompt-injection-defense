@@ -28,8 +28,11 @@ python -m containment.cli eval --suite fixtures
 
 Default Stage-1 is **RulesOnly**. Optional PIGuard: `pip install -e ".[dev,ml]"` then
 follow `docs/AGENT_INSTALL.md` (§7 `CONTAINMENT_STAGE1` / `make_stage1_cascade`).
-Host sandbox, egress proxy, and secret vaults remain **required** (§8 checklist) —
-do not claim zero residual risk.
+Host sandbox, egress proxy, and secret vaults remain **required**
+(`docs/AGENT_INSTALL.md` §8; `docs/HOST_HARDENING.md`). Prefer
+`build_enterprise_host()` so HostGate + signed intents are on. Pin egress with
+`CONTAINMENT_EGRESS_PINNED=1` or `CONTAINMENT_EGRESS_PROXY` /
+`containment-egress-proxy`. Do not claim zero residual risk.
 
 ## Routine: read untrusted text
 
@@ -79,5 +82,6 @@ Report measured ASR / FPR / utility; do not claim certification or zero residual
 - `docs/THREAT_MODEL.md`
 - `docs/ARCHITECTURE.md`
 - `docs/AGENT_INSTALL.md`
+- `docs/HOST_HARDENING.md`
 - `docs/OWASP_LLM_TOP10_MAP.md`
 - `policies/default_deny.yaml`

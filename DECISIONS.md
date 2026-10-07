@@ -207,3 +207,59 @@ No new packages added to default/`[dev]`. PIGuard and StackOne stay optional ext
 
 ### Explicit non-goals (unchanged)
 Full CaMeL/FIDES; Meta PG2 default download; OS sandbox; DNS-rebinding-complete SSRF; Redis required; FedRAMP/SOC2 certification claims.
+
+---
+
+## 2026-10-07 — Leftovers Bar B adopt notes (Host Residual Close + egress proxy)
+
+### HostGate / HostChecklist — **ADOPT**
+- Enterprise / `require_host_gate` refuses mint + privileged execute unless
+  `HostChecklist.ok()` (isolation declared, `SecretProvider`, egress configured,
+  `AuditShipper`).
+- `build_enterprise_host()` fails closed with `ValueError` before returning a
+  broker if isolation/egress are missing.
+
+### SecretProvider — **ADOPT**
+- Protocol + `EnvSecretProvider` + `FileSecretProvider`.
+- Install / README examples use providers; no hardcoded production HMAC bytes
+  in factory defaults.
+
+### AuditShipper — **ADOPT**
+- Protocol + `FileAuditShipper` (JSONL export / tamper-evidence).
+- WORM / SIEM shipping remains host-owned.
+
+### Resolve-pin + in-repo egress proxy — **ADOPT**
+- `egress_resolve` deny CIDRs include CGNAT `100.64/10`; pinned connect helpers.
+- `containment-egress-proxy`: resolve-pin-forward HTTP (CONNECT + absolute-URI).
+- **Skip:** Go iron-proxy clone; TLS MITM / credential injection.
+
+### Ed25519 intents — **ADOPT (optional)**
+- `Ed25519IntentSigner` behind `containment[crypto]`; broker `IntentVerifier`.
+- HMAC remains the default enterprise binding.
+
+### Redis consume store — **ADOPT (optional)**
+- `RedisConsumeStore` behind `containment[redis]`; hermetic fake-client tests.
+- Memory / Sqlite unchanged; Redis not required.
+
+### RateLimitGate — **ADOPT (optional)**
+- `TokenBucketRateLimit` on privileged broker mint when configured.
+- Model API quotas outside the library remain host residual (LLM10).
+
+### Docs — **ADOPT**
+- `docs/HOST_HARDENING.md`; AGENT_INSTALL / THREAT_MODEL / README / SKILL updated.
+
+### Explicit non-goals (Bar B)
+Kata/gVisor images; auto-wiring Claude Code / ChatGPT / Cursor product;
+FedRAMP/SOC2 claims; zero residual when host skips checklist/proxy/isolation.
+
+---
+
+## 2026-10-07 — Leftovers Bar B prove-it (1.3.0)
+
+### Release — **SHIP 1.3.0**
+- Host residual close + in-repo resolve-pin-forward egress proxy landed under LEFTOVERS_HARDEN_PLAN.md.
+- Prove-it: `scripts/microbench_host.py` (sub-ms mean for resolve_and_pin / checklist / rate gate with injected resolver); `./scripts/release_gate.sh` OK; ASR=0.0000, FPR=0.0278; 251 passed, 2 skipped.
+- Push to `origin/main` owned by parent after review (executor did not push).
+
+### Microbench interpretation
+- Numbers measure stdlib `perf_counter` around pure CPU paths (injected DNS, checklist bools, token bucket). They are **not** end-to-end agent latency and exclude LLM round-trips and real DNS.

@@ -9,11 +9,43 @@ from containment.capability_store import (
     MemoryConsumeStore,
     SqliteConsumeStore,
 )
+from containment.capability_store_redis import (
+    CapabilityStoreError,
+    RedisConsumeStore,
+)
 from containment.datamark import DatamarkedText, mark, unwrap
 from containment.detectors.cascade import DetectorCascade
 from containment.detectors.piguard import make_stage1_cascade, select_stage1, stage1_from_env
+from containment.egress_proxy import EgressProxyServer, ProxyConfig
+from containment.egress_resolve import (
+    DenyNetworkError,
+    ResolvedPin,
+    open_pinned_urllib,
+    resolve_and_pin,
+)
+from containment.enterprise import EnterpriseHost, build_enterprise_host
+from containment.host import (
+    AuditShipper,
+    EnvSecretProvider,
+    FileAuditShipper,
+    FileSecretProvider,
+    HostChecklist,
+    RateLimitGate,
+    SecretError,
+    SecretProvider,
+    TokenBucketRateLimit,
+)
+from containment.http_egress import HttpEgressError, fetch_url
 from containment.ingest import IngestResult, ingest
-from containment.intent import IntentError, IntentSigner, SignedIntent, plan_hash
+from containment.intent import (
+    Ed25519IntentSigner,
+    IntentError,
+    IntentSigner,
+    IntentVerifier,
+    SignedIntent,
+    intent_payload_bytes,
+    plan_hash,
+)
 from containment.labels import SecurityLabel
 from containment.moltbook import MOLTBOOK_SUMMARY_SCHEMA, MoltbookError, read_posts
 from containment.plan import IntentEnvelope, Plan, PlanStep
@@ -32,11 +64,12 @@ from containment.url_guard import (
     parse_egress_url,
 )
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 
 __all__ = [
     "ALLOWLIST_SUMMARY_SCHEMA",
     "AuditLog",
+    "AuditShipper",
     "BrokerResult",
     "CapabilityError",
     "CapabilityMinter",
@@ -44,14 +77,27 @@ __all__ = [
     "CapabilityConsumeStore",
     "MemoryConsumeStore",
     "SqliteConsumeStore",
+    "CapabilityStoreError",
+    "RedisConsumeStore",
     "DatamarkedText",
+    "DenyNetworkError",
     "DetectorCascade",
+    "EgressProxyServer",
+    "EnterpriseHost",
+    "EnvSecretProvider",
     "ExtractResult",
+    "FileAuditShipper",
+    "FileSecretProvider",
+    "HostChecklist",
+    "HttpEgressError",
     "IngestResult",
     "IntentEnvelope",
     "IntentError",
     "IntentSigner",
+    "IntentVerifier",
+    "Ed25519IntentSigner",
     "SignedIntent",
+    "intent_payload_bytes",
     "MOLTBOOK_SUMMARY_SCHEMA",
     "MoltbookError",
     "Plan",
@@ -60,22 +106,32 @@ __all__ = [
     "PolicyEngine",
     "PolicyRule",
     "ProposedAction",
+    "ProxyConfig",
     "QuarantineError",
+    "RateLimitGate",
+    "ResolvedPin",
+    "SecretError",
+    "SecretProvider",
     "SecurityLabel",
     "SecurityViolation",
+    "TokenBucketRateLimit",
     "ToolBroker",
     "TraceEvent",
     "ParsedEgressUrl",
     "UrlGuardError",
     "__version__",
+    "build_enterprise_host",
+    "check_url_for_tool",
     "closed_object_schema",
     "extract",
+    "fetch_url",
     "ingest",
     "mark",
-    "check_url_for_tool",
+    "open_pinned_urllib",
     "parse_egress_url",
     "plan_hash",
     "read_posts",
+    "resolve_and_pin",
     "select_stage1",
     "make_stage1_cascade",
     "stage1_from_env",

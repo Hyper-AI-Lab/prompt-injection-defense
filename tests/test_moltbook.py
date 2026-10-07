@@ -198,3 +198,138 @@ def test_default_opener_is_no_redirect() -> None:
 
     opener = _default_opener()
     assert any(isinstance(h, _NoRedirectHandler) for h in opener.handlers)
+
+
+def test_fetch_posts_use_pinned_egress_local(monkeypatch: pytest.MonkeyPatch) -> None:
+    """use_pinned_egress uses fetch_url pin path; connector hits local HTTP origin."""
+    import json
+    import socket
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    payload = {"success": True, "posts": [SAMPLE_POST]}
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, format: str, *args) -> None:  # noqa: A003
+            return
+
+        def do_GET(self) -> None:  # noqa: N802
+            body = json.dumps(payload).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(body)
+
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    port = server.server_address[1]
+    th = threading.Thread(target=server.serve_forever, daemon=True)
+    th.start()
+
+    def resolver(host: str, p: int) -> list[tuple[int, str]]:
+        assert host == "www.moltbook.com"
+        return [(socket.AF_INET, "1.1.1.1")]
+
+    def connector(ip: str, p: int, timeout: float) -> socket.socket:
+        assert ip == "1.1.1.1"
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(timeout)
+        sock.connect(("127.0.0.1", port))
+        return sock
+
+    # open_pinned uses https for moltbook URL; wrap local plain HTTP fails TLS.
+    # Monkeypatch open_pinned_urllib to speak plain HTTP over the pinned socket.
+    import http.client
+
+    from containment import http_egress as he
+    from containment.egress_resolve import ResolvedPin
+
+    def fake_open_pinned(
+        pin: ResolvedPin,
+        *,
+        path: str = "/",
+        timeout: float = 30.0,
+        method: str = "GET",
+        headers: Any = None,
+        body: bytes | None = None,
+        connector: Any = None,
+        ssl_context: Any = None,
+    ) -> Any:
+        sock = connector(pin.pinned_ip, pin.port, timeout) if connector else None
+        assert sock is not None
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=timeout)
+        conn.sock = sock
+        hdrs = {"Host": pin.hostname}
+        if headers:
+            hdrs.update(headers)
+        conn.request(method, path or "/", body=body, headers=hdrs)
+        return conn.getresponse()
+
+    monkeypatch.setattr(he, "open_pinned_urllib", fake_open_pinned)
+    try:
+        posts = fetch_posts(
+            sort="hot",
+            limit=3,
+            use_pinned_egress=True,
+            resolver=resolver,
+            connector=connector,
+        )
+        assert len(posts) == 1
+        assert posts[0]["id"] == "abc-123"
+    finally:
+        server.shutdown()
+
+
+def test_fetch_posts_honors_pinned_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    import containment.moltbook as mb
+    from containment.moltbook import PINNED_ENV
+
+    monkeypatch.setenv(PINNED_ENV, "1")
+    seen: dict[str, Any] = {}
+
+    def fake_fetch_url(url: str, **kwargs: Any) -> bytes:
+        seen["url"] = url
+        seen["kwargs"] = kwargs
+        return json.dumps({"posts": [SAMPLE_POST]}).encode()
+
+    monkeypatch.setattr(mb, "fetch_url", fake_fetch_url)
+    posts = fetch_posts(sort="new", limit=1)
+    assert posts[0]["id"] == "abc-123"
+    assert seen["kwargs"]["use_pinned"] is True
+    assert "www.moltbook.com" in seen["url"]
+
+
+def test_fetch_posts_honors_proxy_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    import containment.moltbook as mb
+    from containment.moltbook import PROXY_ENV
+
+    monkeypatch.setenv(PROXY_ENV, "http://127.0.0.1:3128")
+    seen: dict[str, Any] = {}
+
+    def fake_fetch_url(url: str, **kwargs: Any) -> bytes:
+        seen["kwargs"] = kwargs
+        return json.dumps({"posts": [SAMPLE_POST]}).encode()
+
+    monkeypatch.setattr(mb, "fetch_url", fake_fetch_url)
+    posts = fetch_posts(limit=1)
+    assert posts[0]["id"] == "abc-123"
+    assert seen["kwargs"]["proxy_url"] == "http://127.0.0.1:3128"
+    # proxy wins: use_pinned false when proxy set
+    assert seen["kwargs"]["use_pinned"] is False
+
+
+def test_read_posts_passes_pinned_flag(monkeypatch: pytest.MonkeyPatch) -> None:
+    import containment.moltbook as mb
+
+    seen: dict[str, Any] = {}
+
+    def fake_fetch_posts(**kwargs: Any) -> list[dict[str, Any]]:
+        seen.update(kwargs)
+        return [SAMPLE_POST]
+
+    monkeypatch.setattr(mb, "fetch_posts", fake_fetch_posts)
+    summaries = read_posts(use_pinned_egress=True, proxy_url="http://127.0.0.1:9")
+    assert len(summaries) == 1
+    assert seen["use_pinned_egress"] is True
+    assert seen["proxy_url"] == "http://127.0.0.1:9"

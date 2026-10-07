@@ -21,19 +21,42 @@ python -m containment.cli eval --suite fixtures
 
 ## 2. Load default-deny policy
 
+Prefer the enterprise composition (host gate + signed intents + secrets provider).
+See [HOST_HARDENING.md](HOST_HARDENING.md).
+
 ```python
 from pathlib import Path
+from containment.enterprise import build_enterprise_host
+
+ROOT = Path("/path/to/prompt-injection-defense")
+# Put HMAC bytes in ROOT/secrets/capability and ROOT/secrets/intent (mode 0600).
+host = build_enterprise_host(
+    policy_path=ROOT / "policies" / "default_deny.yaml",
+    audit_path=ROOT / "audit.jsonl",
+    audit_ship_destination=ROOT / "audit-shipped.jsonl",
+    secrets_dir=ROOT / "secrets",
+    isolation_declared=True,   # you run a real OS/container sandbox
+    egress_configured=True,    # or proxy_url="http://127.0.0.1:8888"
+    known_tools=frozenset({"web.fetch", "email.send", "http.post"}),
+)
+broker = host.broker  # require_host_gate=True; signed intents required
+```
+
+Minimal non-enterprise wire (dev only) still needs a `SecretProvider`, not
+inline secrets in committed source:
+
+```python
+from containment.host import FileSecretProvider
 from containment.policy import PolicyEngine
 from containment.broker import ToolBroker
 from containment.audit import AuditLog
 from containment.capability import CapabilityMinter
 
-ROOT = Path("/path/to/prompt-injection-defense")
-policy = PolicyEngine.from_yaml_path(ROOT / "policies" / "default_deny.yaml")
+secrets = FileSecretProvider(ROOT / "secrets")
 broker = ToolBroker(
-    policy=policy,
+    policy=PolicyEngine.from_yaml_path(ROOT / "policies" / "default_deny.yaml"),
     audit=AuditLog(ROOT / "audit.jsonl"),
-    minter=CapabilityMinter(secret=b"set-a-real-32-byte-secret-here!!!"),
+    minter=CapabilityMinter(secret=secrets.get_bytes("capability")),
     known_tools=frozenset({"web.fetch", "email.send", "http.post"}),
 )
 ```
@@ -120,15 +143,22 @@ Notes:
 
 ## 8. Host must still provide (residual checklist)
 
-This library is not a sandbox. Independently of PIGuard-on, hosts **must** still:
+This library is not a sandbox. Independently of PIGuard-on, hosts **must** still
+declare and wire controls. Full recipe: [HOST_HARDENING.md](HOST_HARDENING.md).
 
-1. **OS / container process isolation** — package code runs in-process with the agent.
-2. **Network egress proxy / DNS-aware SSRF controls** beyond `url_guard` helpers
-   (helpers cover literal metadata/private IPs and userinfo; not full DNS rebinding).
-3. **Secret vault** for `CapabilityMinter` / `IntentSigner` HMAC secrets (rotate;
-   never commit plaintext secrets).
-4. **External WORM / signed log shipping** for audit JSONL (file hash chain is
-   tamper-*evidence*, not WORM).
+1. **OS / container process isolation** — package code runs in-process with the
+   agent. Set `isolation_declared=True` only when you actually isolate.
+2. **Egress** — run `containment-egress-proxy` and/or pinned fetch
+   (`CONTAINMENT_EGRESS_PROXY` / `CONTAINMENT_EGRESS_PINNED`). `url_guard` alone
+   is not DNS-rebinding-complete.
+3. **SecretProvider** — `EnvSecretProvider` / `FileSecretProvider` (or vault
+   adapter). Never commit HMAC/Ed25519 material. Enterprise host gate requires it.
+4. **AuditShipper** — export JSONL (`FileAuditShipper`); external WORM/SIEM
+   remains host-owned (hash chain is tamper-evidence, not WORM).
 5. **Supply-chain review** of Hugging Face `trust_remote_code=True` before
    turning PIGuard on.
-6. **Rate limits / spend caps** for model and tool APIs (LLM10 residual).
+6. **RateLimitGate** — optional broker spend cap; also cap model/tool APIs
+   outside the library (LLM10 residual).
+
+Under `enterprise_profile` / `require_host_gate`, incomplete `HostChecklist`
+fails closed before capability mint.

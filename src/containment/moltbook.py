@@ -1,7 +1,10 @@
 """Moltbook public feed reader — untrusted ingest + fixed summary schema.
 
 No account or auth. All posts are treated as untrusted. Network I/O uses
-stdlib ``urllib`` only. Live calls are optional; unit tests must mock HTTP.
+stdlib ``urllib`` by default. Set ``use_pinned_egress=True`` /
+``CONTAINMENT_EGRESS_PINNED=1`` or ``proxy_url`` /
+``CONTAINMENT_EGRESS_PROXY`` for enterprise resolve-pin or forward-proxy
+egress. Live calls are optional; unit tests must mock HTTP.
 """
 
 from __future__ import annotations
@@ -17,12 +20,16 @@ from typing import Any
 from urllib.request import HTTPErrorProcessor, HTTPRedirectHandler, Request
 
 from containment.detectors.cascade import DetectorCascade
+from containment.egress_resolve import ConnectorFn, ResolverFn
+from containment.http_egress import HttpEgressError, fetch_url
 from containment.ingest import IngestResult, default_ingest_cascade, ingest
 from containment.quarantine import closed_object_schema
 from containment.url_guard import UrlGuardError, check_url_for_tool, parse_egress_url
 
 DEFAULT_API_BASE = "https://www.moltbook.com/api/v1"
 LIVE_ENV = "CONTAINMENT_LIVE_MOLTBOOK"
+PINNED_ENV = "CONTAINMENT_EGRESS_PINNED"
+PROXY_ENV = "CONTAINMENT_EGRESS_PROXY"
 DEFAULT_MAX_BYTES = 2_000_000
 
 MOLTBOOK_SUMMARY_SCHEMA: dict[str, Any] = closed_object_schema(
@@ -102,6 +109,20 @@ def _validate_base_url(base_url: str) -> None:
         raise MoltbookError(f"unsafe base_url: {exc.reason}") from exc
 
 
+def _resolve_egress_flags(
+    *,
+    use_pinned_egress: bool,
+    proxy_url: str | None,
+) -> tuple[bool, str | None]:
+    """Kwargs win when truthy; otherwise honor env (PINNED / PROXY)."""
+    pinned = use_pinned_egress or os.environ.get(PINNED_ENV, "").strip() == "1"
+    proxy = proxy_url
+    if proxy is None:
+        env_proxy = os.environ.get(PROXY_ENV, "").strip()
+        proxy = env_proxy or None
+    return pinned, proxy
+
+
 def fetch_posts(
     *,
     sort: str = "new",
@@ -110,11 +131,23 @@ def fetch_posts(
     timeout: float = 20.0,
     opener: Any = None,
     max_bytes: int = DEFAULT_MAX_BYTES,
+    use_pinned_egress: bool = False,
+    proxy_url: str | None = None,
+    resolver: ResolverFn | None = None,
+    connector: ConnectorFn | None = None,
 ) -> list[dict[str, Any]]:
     """GET public ``/posts`` with sort/limit. No auth headers.
 
     ``opener`` is an optional callable ``(Request, timeout=...) -> http response``
     for dependency injection / tests. Defaults to a no-redirect urllib opener.
+
+    Enterprise egress (when ``opener`` is not set):
+    - ``use_pinned_egress=True`` or env ``CONTAINMENT_EGRESS_PINNED=1``:
+      DNS resolve-pin via ``containment.http_egress.fetch_url``.
+    - ``proxy_url`` or env ``CONTAINMENT_EGRESS_PROXY`` (e.g.
+      ``http://127.0.0.1:3128``): forward through that HTTP proxy
+      (typically ``containment-egress-proxy``).
+    Explicit ``opener`` always wins (test DI / back-compat).
     """
     if limit < 1 or limit > 100:
         raise ValueError("limit must be in 1..100")
@@ -137,34 +170,44 @@ def fetch_posts(
     except UrlGuardError as exc:
         raise MoltbookError(f"unsafe fetch url: {exc.reason}") from exc
 
-    req = Request(
-        url,
-        headers={
-            "Accept": "application/json",
-            "User-Agent": "containment-moltbook-reader/0.1",
-        },
-        method="GET",
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": "containment-moltbook-reader/0.1",
+    }
+
+    pinned, proxy = _resolve_egress_flags(
+        use_pinned_egress=use_pinned_egress,
+        proxy_url=proxy_url,
     )
-    if opener is None:
-        open_fn = _default_opener().open
+
+    if opener is not None:
+        body = _fetch_with_opener(
+            url, opener=opener, timeout=timeout, max_bytes=max_bytes, headers=headers
+        )
+    elif pinned or proxy:
+        try:
+            body = fetch_url(
+                url,
+                max_bytes=max_bytes,
+                timeout=timeout,
+                use_pinned=bool(pinned) and not proxy,
+                proxy_url=proxy,
+                resolver=resolver,
+                connector=connector,
+                headers=headers,
+                allowed_schemes=frozenset({"https"}),
+                host_allowlist={_DEFAULT_HOST},
+            )
+        except HttpEgressError as exc:
+            raise MoltbookError(str(exc)) from exc
     else:
-        open_fn = opener
-    try:
-        with open_fn(req, timeout=timeout) as resp:
-            status = getattr(resp, "status", None) or resp.getcode()
-            body = resp.read(max_bytes + 1)
-    except MoltbookError:
-        raise
-    except urllib.error.HTTPError as exc:
-        raise MoltbookError(f"HTTP {exc.code} fetching {url}") from exc
-    except urllib.error.URLError as exc:
-        raise MoltbookError(f"network error fetching {url}: {exc.reason}") from exc
-
-    if len(body) > max_bytes:
-        raise MoltbookError(f"response exceeds max_bytes {max_bytes}")
-
-    if status and int(status) >= 400:
-        raise MoltbookError(f"HTTP {status} fetching {url}")
+        body = _fetch_with_opener(
+            url,
+            opener=_default_opener().open,
+            timeout=timeout,
+            max_bytes=max_bytes,
+            headers=headers,
+        )
 
     try:
         payload = json.loads(body.decode("utf-8"))
@@ -181,6 +224,34 @@ def fetch_posts(
         if isinstance(item, dict):
             out.append(item)
     return out
+
+
+def _fetch_with_opener(
+    url: str,
+    *,
+    opener: Any,
+    timeout: float,
+    max_bytes: int,
+    headers: Mapping[str, str],
+) -> bytes:
+    req = Request(url, headers=dict(headers), method="GET")
+    try:
+        with opener(req, timeout=timeout) as resp:
+            status = getattr(resp, "status", None) or resp.getcode()
+            body = resp.read(max_bytes + 1)
+    except MoltbookError:
+        raise
+    except urllib.error.HTTPError as exc:
+        raise MoltbookError(f"HTTP {exc.code} fetching {url}") from exc
+    except urllib.error.URLError as exc:
+        raise MoltbookError(f"network error fetching {url}: {exc.reason}") from exc
+
+    if len(body) > max_bytes:
+        raise MoltbookError(f"response exceeds max_bytes {max_bytes}")
+
+    if status and int(status) >= 400:
+        raise MoltbookError(f"HTTP {status} fetching {url}")
+    return body
 
 
 def ingest_post(
@@ -221,8 +292,17 @@ def read_posts(
     timeout: float = 20.0,
     opener: Any = None,
     max_bytes: int = DEFAULT_MAX_BYTES,
+    use_pinned_egress: bool = False,
+    proxy_url: str | None = None,
+    resolver: ResolverFn | None = None,
+    connector: ConnectorFn | None = None,
 ) -> list[MoltbookPostSummary]:
-    """Fetch public posts and run each through containment ingest."""
+    """Fetch public posts and run each through containment ingest.
+
+    Passes ``use_pinned_egress`` / ``proxy_url`` / env
+    ``CONTAINMENT_EGRESS_PINNED`` and ``CONTAINMENT_EGRESS_PROXY`` through
+    to :func:`fetch_posts` (see that docstring).
+    """
     posts = fetch_posts(
         sort=sort,
         limit=limit,
@@ -230,6 +310,10 @@ def read_posts(
         timeout=timeout,
         opener=opener,
         max_bytes=max_bytes,
+        use_pinned_egress=use_pinned_egress,
+        proxy_url=proxy_url,
+        resolver=resolver,
+        connector=connector,
     )
     return [
         ingest_post(p, task_id=task_id, cascade=cascade) for p in posts
@@ -246,6 +330,8 @@ __all__ = [
     "DEFAULT_MAX_BYTES",
     "LIVE_ENV",
     "MOLTBOOK_SUMMARY_SCHEMA",
+    "PINNED_ENV",
+    "PROXY_ENV",
     "MoltbookError",
     "MoltbookPostSummary",
     "candidate_from_post",

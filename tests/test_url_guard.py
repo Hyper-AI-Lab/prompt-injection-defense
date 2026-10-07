@@ -54,6 +54,13 @@ def test_metadata_ip_blocked() -> None:
         check_public_only("https://169.254.169.254/latest")
 
 
+def test_cgnat_literal_blocked() -> None:
+    assert is_blocked_ip_literal("100.64.1.1") is True
+    with pytest.raises(UrlGuardError) as ei:
+        check_public_only("https://100.64.1.1/")
+    assert ei.value.code == "not_public"
+
+
 def test_public_hostname_ok() -> None:
     parsed = check_url_for_tool(
         "https://example.com/a",

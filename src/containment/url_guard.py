@@ -97,21 +97,21 @@ def _try_ip(host: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
 
 
 def is_blocked_ip_literal(host: str) -> bool:
-    """True for localhost aliases and non-public IP literals (incl. odd forms)."""
+    """True for localhost aliases and non-public IP literals (incl. odd forms).
+
+    IP deny checks (incl. CGNAT) go through ``egress_resolve.ip_is_denied``.
+    """
     lowered = host.lower().rstrip(".")
     if lowered in {"localhost", "localhost.localdomain", "metadata.google.internal"}:
         return True
     ip = _try_ip(lowered)
     if ip is None:
         return False
-    return bool(
-        ip.is_private
-        or ip.is_loopback
-        or ip.is_link_local
-        or ip.is_unspecified
-        or ip.is_multicast
-        or ip.is_reserved
-    )
+    # Lazy import avoids circular import at module load
+    # (egress_resolve imports parse helpers from this module).
+    from containment.egress_resolve import ip_is_denied
+
+    return ip_is_denied(ip)
 
 
 def check_public_only(url: str) -> None:

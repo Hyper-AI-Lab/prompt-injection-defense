@@ -38,15 +38,27 @@ is influenced by injected instructions.
 5. **Tool broker** — unknown tools denied; schema check; capability mint one-use; audit append.
 6. **Fail closed** — detector error / missing Stage-1 weights advise deny for privileged sinks.
 7. **Datamarking** — optional spotlighting helpers for trusted instructions vs untrusted data.
-8. **Signed intents (HMAC)** — optional/enterprise: verify `IntentEnvelope` MAC + expiry + `plan_hash` before capability mint (`require_signed_intent` / `enterprise_profile`).
-9. **Capability consume store** — pluggable one-use consume (`MemoryConsumeStore` default; `SqliteConsumeStore` for multi-process).
-10. **url_guard** — shared egress URL parsing: scheme allowlist, userinfo reject, literal metadata/private IP deny; wired into policy/broker/moltbook.
+8. **Signed intents (HMAC / optional Ed25519)** — enterprise: verify `IntentEnvelope`
+   authenticity + expiry + `plan_hash` before capability mint
+   (`require_signed_intent` / `enterprise_profile`).
+9. **Capability consume store** — pluggable one-use consume (`MemoryConsumeStore`
+   default; `SqliteConsumeStore`; optional `RedisConsumeStore` behind `[redis]`).
+10. **url_guard + resolve-pin + egress proxy** — literal SSRF helpers; DNS
+    resolve-pin helpers; in-repo `containment-egress-proxy` (resolve-pin-forward,
+    not TLS MITM).
+11. **HostGate** — `HostChecklist` (isolation declaration, `SecretProvider`,
+    egress configured, `AuditShipper`); fail-closed under enterprise /
+    `require_host_gate`. See `docs/HOST_HARDENING.md`.
+12. **RateLimitGate** — optional token-bucket on privileged broker mint (LLM10).
 
 ## Non-goals / residual risk
 
 - No claim of immunity to adaptive or novel attacks.
 - Detectors can miss (false negatives) or over-flag (false positives); policy is the authority boundary.
-- Does not replace OS process isolation, network egress proxies, or secret vaults.
+- Does not replace OS process isolation. In-package interfaces cover vault-shaped
+  secrets (`SecretProvider`), audit export (`AuditShipper`), rate gates, and an
+  optional resolve-pin forward proxy; residual remains if the host skips
+  checklist / proxy / real isolation (see `docs/HOST_HARDENING.md`).
 - Optional HF weights (PIGuard / Prompt Guard 2) may be unavailable; offline mode uses rules + fail-closed privileged path.
 - Live third-party APIs (Moltbook) remain untrusted even when “verified” by the host site.
 - **Audit trail integrity residual (L3):** `AuditLog` is an append-only JSONL file with a
@@ -54,20 +66,23 @@ is influenced by injected instructions.
   write access can truncate, rewrite, or replace the file; truncation/rewrite is not
   cryptographically prevented. This is **not** WORM storage. Treat the chain as tamper-
   *evidence* against casual edits, not as integrity against a privileged filesystem adversary.
-  External WORM / signed log shipping remains out of scope for this package.
-- **Signed intent residual:** HMAC binding authenticates envelopes only when the host
-  configures `require_signed_intent` / enterprise profile and protects the signer secret.
-  Unsigned paths remain available for non-enterprise deployments; Ed25519 is not required
-  in 1.2. Compromised signer secrets forge intents — keep secrets in a vault.
-- **SSRF / URL residual:** `url_guard` blocks literal metadata/private IPs, userinfo, and
-  bad schemes; it does **not** perform DNS resolution or defeat DNS rebinding. Hosts must
-  still run an egress proxy / allowlist beyond these helpers. Moltbook disables redirects
-  and caps read size, but third-party sites remain untrusted content sources.
+  `AuditShipper` exports JSONL for host SIEM/WORM; the package still does not
+  provide WORM storage itself.
+- **Signed intent residual:** binding authenticates envelopes only when the host
+  configures `require_signed_intent` / enterprise profile and protects signer
+  material via `SecretProvider` (HMAC) or Ed25519 keys (`containment[crypto]`).
+  Unsigned paths remain for non-enterprise deployments. Compromised signer
+  secrets forge intents; keep material in a vault, not source.
+- **SSRF / URL residual:** `url_guard` blocks literal metadata/private IPs, userinfo,
+  and bad schemes. Resolve-pin helpers and `containment-egress-proxy` close DNS
+  check-then-connect gaps when used. Residual remains if the host bypasses both
+  and reconnects after a separate check. Moltbook disables redirects and caps
+  read size; third-party sites remain untrusted content sources.
 - **Multi-process capability store residual:** `MemoryConsumeStore` does not synchronize
   across processes (double-consume possible under multi-worker hosts). Use
-  `SqliteConsumeStore` (or a future external store) when multiple broker processes share
-  mint/verify. SQLite file permissions and locking are host responsibilities; Redis is
-  not a required dependency.
+  `SqliteConsumeStore` or optional `RedisConsumeStore` (`containment[redis]`) when
+  multiple broker processes share mint/verify. Store permissions and locking are
+  host responsibilities; Redis is not a required dependency.
 - **LLM08 / LLM09 / multimodal:** no in-package vector store (LLM08 N/A); misinformation
   (LLM09) out of authority-path scope; image-embedded injection out of the text fixture
   corpus — see `docs/OWASP_LLM_TOP10_MAP.md`.

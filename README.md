@@ -19,6 +19,15 @@ reference monitor; irreversible actions require exact independent authorization.
 
 See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
+## Host residual close (Bar B)
+
+Enterprise hosts should use `build_enterprise_host()` plus
+[docs/HOST_HARDENING.md](docs/HOST_HARDENING.md): `HostChecklist` / HostGate,
+`SecretProvider`, `AuditShipper`, resolve-pin helpers, and optional
+`containment-egress-proxy` (resolve-pin-forward; not TLS MITM). Optional
+Ed25519 (`[crypto]`), Redis consume store (`[redis]`), and `RateLimitGate`.
+This is not a FedRAMP claim and not an OS sandbox.
+
 ## Install
 
 Python 3.12+ recommended. PyPI package name is `containment`.
@@ -77,11 +86,15 @@ assert result.label.integrity == "untrusted"
 assert result.ok
 
 # 2) Privileged tools go through the broker (default deny)
+# Prefer build_enterprise_host() for production (see docs/HOST_HARDENING.md).
+from containment.host import FileSecretProvider
+
+secrets = FileSecretProvider(Path("secrets"))  # files: capability, intent
 policy = PolicyEngine.from_yaml_path("policies/default_deny.yaml")
 broker = ToolBroker(
     policy=policy,
     audit=AuditLog(Path("audit.jsonl")),
-    minter=CapabilityMinter(secret=b"replace-me-with-32-byte-secret!!"),
+    minter=CapabilityMinter(secret=secrets.get_bytes("capability")),
     known_tools=frozenset({"web.fetch", "email.send"}),
 )
 plan = Plan(
@@ -132,12 +145,13 @@ python -m containment.cli eval --suite fixtures --no-policy
 - `src/containment/` — labels, policy, broker, ingest, detectors, quarantine, moltbook, CLI
 - `policies/default_deny.yaml` — default-deny tool policy
 - `fixtures/attacks` / `fixtures/benign` — offline eval corpus
-- `docs/` — threat model, architecture, agent install
+- `docs/` — threat model, architecture, agent install, host hardening
 - `SKILL.md` — procedure for Grok bots / agents
 
 ## Agent install
 
-See [docs/AGENT_INSTALL.md](docs/AGENT_INSTALL.md) and [SKILL.md](SKILL.md).
+See [docs/AGENT_INSTALL.md](docs/AGENT_INSTALL.md),
+[docs/HOST_HARDENING.md](docs/HOST_HARDENING.md), and [SKILL.md](SKILL.md).
 
 ## CI / SBOM (local)
 

@@ -12,7 +12,9 @@ from containment.audit import AuditLog
 from containment.capability import CapabilityMinter, CapabilityToken
 from containment.detectors.base import CascadeResult
 from containment.detectors.cascade import PRIVILEGED_SINKS, privileged_sink_fail_closed
-from containment.intent import IntentError, IntentSigner, SignedIntent
+from containment.host.checklist import HostChecklist
+from containment.host.rate_limit import RateLimitGate
+from containment.intent import IntentError, IntentVerifier, SignedIntent
 from containment.plan import Plan
 from containment.policy import PolicyEngine
 from containment.tool_schemas import registry_schema_validator
@@ -99,8 +101,11 @@ class ToolBroker:
         executor: Executor | None = None,
         known_tools: frozenset[str] | None = None,
         require_signed_intent: bool = False,
-        intent_signer: IntentSigner | None = None,
+        intent_signer: IntentVerifier | None = None,
         enterprise_profile: bool = False,
+        require_host_gate: bool = False,
+        host_checklist: HostChecklist | None = None,
+        rate_limit: RateLimitGate | None = None,
     ) -> None:
         self.policy = policy
         self.audit = audit
@@ -109,9 +114,12 @@ class ToolBroker:
         self.approval = approval
         self.executor = executor
         self.known_tools = known_tools
-        self.require_signed_intent = bool(require_signed_intent or enterprise_profile)
-        self.intent_signer = intent_signer
         self.enterprise_profile = bool(enterprise_profile)
+        self.require_signed_intent = bool(require_signed_intent or self.enterprise_profile)
+        self.intent_signer = intent_signer
+        self.require_host_gate = bool(require_host_gate or self.enterprise_profile)
+        self.host_checklist = host_checklist
+        self.rate_limit = rate_limit
 
     def secure_execute(
         self,
@@ -124,6 +132,26 @@ class ToolBroker:
         fail_closed_privileged: bool = False,
         intent: SignedIntent | None = None,
     ) -> BrokerResult:
+        # 0a) Host gate (enterprise / require_host_gate): fail closed before mint.
+        if self.require_host_gate:
+            if self.host_checklist is None:
+                decision = PolicyDecision(
+                    effect="deny",
+                    rule_id="host_gate_required",
+                    reason="host checklist required but not provided",
+                )
+                self.audit.append_decision(action, decision)
+                raise SecurityViolation(decision.reason, decision=decision)
+            if not self.host_checklist.ok():
+                codes = ",".join(self.host_checklist.failures())
+                decision = PolicyDecision(
+                    effect="deny",
+                    rule_id="host_checklist_failed",
+                    reason=f"host checklist failed: {codes}",
+                )
+                self.audit.append_decision(action, decision)
+                raise SecurityViolation(decision.reason, decision=decision)
+
         # 0) Signed intent gate (enterprise / require_signed_intent).
         if self.require_signed_intent:
             if intent is None:
@@ -290,6 +318,21 @@ class ToolBroker:
                     )
                     self.audit.append_decision(action, decision)
                     raise SecurityViolation(decision.reason, decision=decision)
+
+        # 7b) Rate / spend gate for privileged sinks (optional when configured).
+        if self.rate_limit is not None and action.tool in PRIVILEGED_SINKS:
+            if not self.rate_limit.allow(action.tool, cost=1.0):
+                decision = PolicyDecision(
+                    effect="deny",
+                    rule_id="rate_limit_exceeded",
+                    reason=(
+                        f"rate/spend budget exhausted for privileged sink "
+                        f"{action.tool!r}"
+                    ),
+                    display=decision.display,
+                )
+                self.audit.append_decision(action, decision)
+                raise SecurityViolation(decision.reason, decision=decision)
 
         # 8) Mint one-use capability.
         resources = _resource_hints(action)
