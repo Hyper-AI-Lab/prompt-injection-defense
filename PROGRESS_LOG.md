@@ -1151,3 +1151,19 @@ Version **1.2.0** everywhere; `scripts/release_gate.sh` exit 0; commit; push `or
 - placeholder scan clean; GATE_EXIT=0
 
 ### Verdict: VERIFIED (pre-push); post-push note follows after `git push`
+
+## Enterprise Bar A — Step 11 post-push — 2026-10-07 16:56 JST
+
+### Push evidence
+- Remote URL: `https://github.com/Hyper-AI-Lab/prompt-injection-defense.git`
+- `origin/main` HEAD after push: `a78b08578436201f42bff7d6e462651b298e004f` (Release containment 1.2.0)
+- Also pushed prior `8c1a687` (steps 1–5)
+- Version on tree: **1.2.0**; release_gate exit 0; pytest **171 passed, 1 skipped**
+- Eval: ASR=0.0000 FPR=0.0278 utility=0.9722
+
+### Residual (workflow scope)
+- Full push of `.github/workflows/ci.yml` rejected: OAuth token scopes are `gist, read:org, repo` — missing `workflow`.
+- Workflow commit prepared locally as `5fd8b5b` / restored after this log; **not** on `origin/main` until a credential with `workflow` scope pushes it.
+- Dependabot + all other Bar A 6–11 content **is** on remote at `a78b085`.
+
+### Verdict: VERIFIED (code 1.2.0 on origin/main); CI workflow file pending `workflow` scope
