@@ -1493,3 +1493,14 @@ Limiter: CPU / Python call overhead (stdlib clock); not network or model latency
 - Done predicate items 1–12 satisfied locally except `origin/main` push (parent).
 
 ### Verdict: VERIFIED (local; push pending parent)
+
+## Leftovers Bar B — Step 11 post-push — 2026-10-07 22:23 JST
+
+### Push evidence
+- Remote: https://github.com/Hyper-AI-Lab/prompt-injection-defense.git
+- `origin/main` HEAD: `9e3037f4d8d2d7b868924955269eae2a46f1131e`
+- Version: **1.3.0**
+- release_gate: OK (251 passed, 2 skipped; ASR=0.0000 FPR=0.0278)
+- Microbench (n=2000): resolve_and_pin mean 0.0163 ms; HostChecklist.ok 0.0001 ms; TokenBucket 0.0006 ms
+
+### Verdict: VERIFIED (Bar B complete on origin/main)
