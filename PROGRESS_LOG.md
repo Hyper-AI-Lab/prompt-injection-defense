@@ -805,3 +805,76 @@ rg -n "AUDIT harden step 18|stackone-defender==0.8.2|stage1_timeout" DECISIONS.m
 ```
 
 ### Verdict: VERIFIED
+
+## AUDIT Harden Step 19 — Final prove-it (v1.1.0) — 2026-10-07 16:19 JST
+
+### Hypothesis
+Version bump to 1.1.0 + green `scripts/release_gate.sh` + measured ON/OFF eval + H1–H5/M1–M6 addressed in this log proves the audit harden done-predicate on the real artifact; push updates `origin/main`.
+
+### What changed
+- `pyproject.toml`: `version = "1.1.0"`
+- `src/containment/__init__.py`: `__version__ = "1.1.0"`
+- No other version constants declared elsewhere (CLI imports `__version__`)
+
+### Findings addressed (H1–H5, M1–M6)
+| ID | Topic | Step |
+|----|-------|------|
+| H1 | Empty-label fail-closed on privileged sinks | 2 |
+| H2 | Detector fail-closed wired into broker | 3 |
+| H3 | Production default ingest = RulesOnly | 4 |
+| H4 | Policy limits enforced (+ MFA/display part) | 7–8 |
+| H5 | Eval honesty (detector vs policy rates) | 13 |
+| M1 | Plan step binding | 5 |
+| M2 | MFA + display on approval | 7 |
+| M3 | Confidentiality predicate honesty | 9 |
+| M4 | Plan expiry | 6 |
+| M5 | Stage-2 NoOp aggregate footgun | 10 |
+| M6 | Eval per-case / not synthetic constant deny | 13 |
+
+(Also L1–L3 / WEAK items in steps 11–12, 14–18 — outside H/M list but VERIFIED earlier.)
+
+### Verify command + output summary
+```bash
+./scripts/release_gate.sh
+# GATE_EXIT=0
+# containment==1.1.0 installed
+# ruff: All checks passed
+# pytest: 141 passed, 1 skipped in 3.48s
+# eval ON: ASR=0.0000 FPR=0.0294 utility=0.9706
+#          detector_block_rate=0.7632 policy_block_rate=1.0000
+#          blocked 38/38 attacks; flagged 1/34 benign
+# placeholder scan clean
+
+.venv/bin/python -m containment.cli eval --suite fixtures --no-policy
+# ASR=1.0000 FPR=0.0294 utility=0.9706
+# detector_block_rate=0.7632 policy_block_rate=0.0000
+# blocked 0/38 attacks
+
+.venv/bin/python -c "import containment; print(containment.__version__)"  # 1.1.0
+```
+
+### Metrics table (measured)
+| Mode | attacks | benign | ASR | FPR | utility | detector_block_rate | policy_block_rate |
+|------|---------|--------|-----|-----|---------|---------------------|-------------------|
+| policy ON | 38 | 34 | 0.0000 | 0.0294 | 0.9706 | 0.7632 | 1.0000 |
+| policy OFF | 38 | 34 | 1.0000 | 0.0294 | 0.9706 | 0.7632 | 0.0000 |
+
+ON vs OFF differs on ASR and policy_block_rate; detector_block_rate identical (same cascade/hints); not a constant synthetic deny for all 38 under policy attribution alone.
+
+### Known limits remaining (honest)
+- Not injection-proof; authority/taint/policy + detectors, not model immunity
+- Default Stage-1 is RulesOnly (fail-closed privileged) unless `containment[ml]` + PIGuard / optional `[stackone]`
+- FPR 0.0294 on committed benign corpus (1/34 flagged)
+- Prompt Guard 2 gated — skipped; no FIDES/CaMeL/AGT/Invariant/PG2 weights/TS SDK (explicit non-goals)
+- Live Moltbook smoke skipped unless `CONTAINMENT_LIVE_MOLTBOOK=1`
+- No OS sandbox / full SSRF stack; audit JSONL not WORM (filesystem writer can truncate; hash-chain is residual integrity only)
+- Stage-2 remains NoOp by default (non-elevating); no adaptive-attack immunity claim
+
+### Gate result
+- **Gate exit:** 0
+- **pytest:** 141 passed, 1 skipped
+- **Version:** containment 1.1.0
+- **Prior harden commits present:** `ba9d916` (steps 1–8), `3b9671a` (steps 9–18)
+
+### Verdict: VERIFIED (pre-push)
+Push to `origin/main` follows; remote HEAD confirmation appended after push.
