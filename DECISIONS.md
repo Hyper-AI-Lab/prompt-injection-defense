@@ -342,3 +342,15 @@ Live AgentDojo / hosted shields / LLM round-trips in CI; release ritual / bot
 playbook; expanding fixture corpus unless a bug requires it; SOTA or FedRAMP
 claims.
 
+---
+
+## 2026-10-08 — Bar E audit harden (→ 1.6.1)
+
+### control_ok rounding coherence — **ADOPT**
+- `control_is_ok` now compares ASR after the same 4-decimal rounding used by
+  Markdown/JSON display and `on_asr_is_ok`. Prevents gate=PASS with printed
+  ON=OFF=`0.0000` when raw OFF is only a tiny epsilon above ON.
+- Docs / `release_gate.sh` comments / SKILL / AGENT_INSTALL aligned.
+- ARCHITECTURE Modules + README layout name `eval_card` (X1/X2).
+- Residuals unchanged: card stays out of `release_gate`; artifacts gitignored.
+

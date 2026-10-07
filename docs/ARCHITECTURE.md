@@ -43,6 +43,7 @@ untrusted bytes
 | `ingest` | wires label → cascade → quarantine |
 | `moltbook` | public posts client → ingest → `{title,topic,summary}` |
 | `cli` / `eval_runner` | offline ASR/FPR/utility |
+| `eval_card` | Bar E: citable ON+OFF Markdown/JSON scorecard; fail-closed CLI; reuses `run_eval` |
 | `adapters` | Bar C: `BrokeredRegistry`, `brokered_tool`, Claude PreToolUse hook CLI |
 | `reference_host` | Bar D: enterprise compose demo; hermetic attack/benign/human scenarios |
 | `enterprise` / `host` | HostGate checklist, SecretProvider, AuditShipper, rate limit, egress hints |

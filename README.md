@@ -170,7 +170,7 @@ the card CLI is the separate prove-it smoke.
 
 ## Package layout
 
-- `src/containment/` — labels, policy, broker, ingest, detectors, quarantine, moltbook, adapters (Bar C), reference_host (Bar D), CLI
+- `src/containment/` — labels, policy, broker, ingest, detectors, quarantine, moltbook, adapters (Bar C), reference_host (Bar D), eval_card (Bar E), CLI
 - `policies/default_deny.yaml` — default-deny tool policy
 - `fixtures/attacks` / `fixtures/benign` — offline eval corpus
 - `docs/` — threat model, architecture, agent install, host hardening, eval card

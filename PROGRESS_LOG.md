@@ -2284,3 +2284,114 @@ Confirm `origin/main` carries **containment 1.6.0** after Bar E eval card.
 Every step VERIFIED; card module + CLI shipped; docs/exports; release_gate OK; **1.6.0** on origin/main.
 
 ### Verdict: VERIFIED
+
+## Bar E Audit — Step 1 Baseline — 2026-10-08 JST
+
+### Scope
+Law `BAR_E_AUDIT_HARDEN_PLAN.md` step 1. No code changes. Record gate, pytest, eval, card smoke, HEAD.
+
+### Evidence
+- HEAD: `d025cf2408d1bcc449c20628fc200e3f6b0c0a39` (docs append after release `0777824`)
+- Version: **1.6.0** (pyproject / installed)
+- `scripts/release_gate.sh` exit **0**
+- pytest via gate: **304 passed**, 2 skipped (~20.9s)
+- `containment eval` suite=fixtures policy ON: attacks 53, benign 36; **ASR 0.0000**; FPR 0.0278; utility 0.9722; detector_block_rate 0.7358; policy_block_rate 1.0000; blocked 53/53
+- `containment-eval-card --suite fixtures --out-dir /tmp/bar-e-audit-card`: exit **0**; gate=PASS; ON ASR 0.0000; OFF ASR 1.0000; control_ok=True; on_asr_ok=True; wrote eval-card.json + eval-card.md; version=1.6.0 sha=d025cf2408d1
+- Principles: prove-it-works (real gate+CLI), sequence-verifiable-units (baseline before swarm)
+
+### Verdict: VERIFIED
+
+## Bar E Audit — Step 2 Local swarm (N=4) — 2026-10-08 JST
+
+### Scope
+Law step 2. Local executors A–D (no Cloud Agents). Write slice reports + aggregate.
+
+### Evidence
+- `swarm-reports/bar-e-audit/slice-A-plan-predicate.md` — ISSUES (→ E1)
+- `swarm-reports/bar-e-audit/slice-B-vision-architecture.md` — PASS
+- `swarm-reports/bar-e-audit/slice-C-code-integrity.md` — ISSUES (E1 MED)
+- `swarm-reports/bar-e-audit/slice-D-docs-claims.md` — ISSUES (X1, X2 LOW)
+- `swarm-reports/bar-e-audit/SWARM_AGGREGATE.md` — ISSUES to clear: E1, X1, X2; residuals listed
+- Principles: sequence-verifiable-units, prove-it-works (repro for E1), boundary-discipline (card_from_dict residual), laziness-protocol (no nested evals package)
+
+### Verdict: VERIFIED
+
+## Bar E Audit — Step 3 Plan-match report — 2026-10-08 JST
+
+### Scope
+Law step 3. Commit-ready `AUDIT_PLAN_VS_BAR_E.md` mapping plan + vision to evidence; GAP list = aggregate ISSUES.
+
+### Evidence
+- Wrote `AUDIT_PLAN_VS_BAR_E.md`
+- Matrix: done-predicate PASS×4, GAP×1 (E1); vision all PASS; docs X1/X2
+- GAP list matches SWARM_AGGREGATE ISSUES to clear
+- Principles: encode-lessons-in-structure (matrix as law input for steps 4–6), sequence-verifiable-units
+
+### Verdict: VERIFIED
+
+## Bar E Audit — Step 4 Fix GAPs cluster E — 2026-10-08 JST
+
+### Scope
+Law step 4. Evidenced ISSUE E1 only.
+
+### Evidence
+- `control_is_ok` now `round_asr(off) > round_asr(on)` in `src/containment/eval_card.py`
+- Markdown threshold line mentions 4-decimal rounding for control_ok
+- Tests: extended `test_control_is_ok_requires_strictly_worse_off`; added `test_control_ok_matches_displayed_asr_rounding`
+- `python3 -m pytest tests/test_eval_card.py` → **12 passed**
+- Principles: prove-it-works (repro locked), test-behavior-not-implementation (assert FAIL gate + equal displayed ASR), model-the-domain (rounding is part of the gate predicate), encode-lessons-in-structure (rounding in helper not docs-only)
+
+### Verdict: VERIFIED
+
+## Bar E Audit — Step 5 Fix GAPs cluster X — 2026-10-08 JST
+
+### Scope
+Law step 5. X1/X2 docs + E1 claim scrub across surfaces.
+
+### Evidence
+- `docs/ARCHITECTURE.md`: Modules row `eval_card` (X1)
+- `README.md`: package layout names `eval_card (Bar E)` (X2)
+- `docs/EVAL_CARD.md`, `scripts/release_gate.sh`, `SKILL.md`, `docs/AGENT_INSTALL.md`: control_ok rounding wording
+- `DECISIONS.md`: append-only entry “Bar E audit harden (→ 1.6.1)” (ADOPT control_ok rounding)
+- Principles: laziness-protocol (docs-only for X), encode-lessons-in-structure (ARCHITECTURE module table)
+
+### Verdict: VERIFIED
+
+## Bar E Audit — Step 6 Integrity + regression — 2026-10-08 JST
+
+### Scope
+Law step 6. Lock findings; ruff/pytest/placeholder; update matrix/aggregate cleared status.
+
+### Evidence
+- Placeholder scan on Bar E surfaces: clean
+- `ruff check` eval_card + tests: clean
+- `pytest tests/test_eval_card.py`: **12 passed**
+- E1 repro: on=0 / off=0.00004 → control_ok False, Markdown Gate FAIL
+- `AUDIT_PLAN_VS_BAR_E.md` + `SWARM_AGGREGATE.md` marked GAPs CLEARED
+- Principles: prove-it-works, test-behavior-not-implementation, encode-lessons-in-structure
+
+### Verdict: VERIFIED
+
+## Bar E Audit — Step 7 Final prove-it (pre-push) — 2026-10-08 JST
+
+### Scope
+Law step 7. Behavior fix landed → bump **1.6.1**; release_gate; card smoke; commit + push.
+
+### Evidence
+- Version: pyproject + `__version__` = **1.6.1**
+- `scripts/release_gate.sh` exit **0**
+- pytest via gate: **305 passed**, 2 skipped (~20.0s)
+- Eval: ASR **0.0000**; FPR 0.0278; utility 0.9722; blocked 53/53 (not worse than 1.6.0)
+- `containment-eval-card`: gate=PASS; ON 0.0000; OFF 1.0000; version=1.6.1
+- Fixes: E1 control_ok rounding; X1 ARCHITECTURE; X2 README; docs scrub; DECISIONS append
+- Artifacts: `AUDIT_PLAN_VS_BAR_E.md`, `BAR_E_AUDIT_HARDEN_PLAN.md`, `swarm-reports/bar-e-audit/`
+- Principles: prove-it-works, sequence-verifiable-units, laziness-protocol (surgical E1), boundary-discipline, test-behavior-not-implementation, encode-lessons-in-structure, model-the-domain
+
+### Residuals accepted (restate)
+- Card not inside release_gate (by design)
+- Generated card artifacts gitignored
+- card_from_dict trusts JSON flags (test helper)
+- --suite label-only; threshold helpers via eval_card import path
+- Prior Bar C+D residuals unchanged
+
+### Verdict: VERIFIED (pre-push; push next)

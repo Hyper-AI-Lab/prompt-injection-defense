@@ -48,6 +48,6 @@ echo "release_gate: placeholder scan clean"
 #   containment-eval-card --suite fixtures --out-dir artifacts/eval-card
 # Thresholds (see containment.eval_card + docs/EVAL_CARD.md):
 #   on_asr_ok  → ON ASR == 0.0000 (4-decimal round)
-#   control_ok → OFF ASR > ON ASR
+#   control_ok → OFF ASR > ON ASR (4-decimal round)
 echo "release_gate: OK"
 exit 0

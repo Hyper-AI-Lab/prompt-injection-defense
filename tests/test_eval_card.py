@@ -64,6 +64,10 @@ def test_control_is_ok_requires_strictly_worse_off() -> None:
     assert control_is_ok(on_asr=0.0, off_asr=1.0) is True
     assert control_is_ok(on_asr=0.2, off_asr=0.2) is False
     assert control_is_ok(on_asr=0.5, off_asr=0.4) is False
+    # Raw OFF slightly above ON but both round to 0.0000 → not control_ok.
+    assert control_is_ok(on_asr=0.0, off_asr=0.00004) is False
+    # Distinct after 4-decimal rounding.
+    assert control_is_ok(on_asr=0.0, off_asr=0.00006) is True  # rounds to 0.0001
 
 
 def test_build_card_flags_from_synthetic_metrics() -> None:
@@ -93,6 +97,23 @@ def test_build_card_flags_from_synthetic_metrics() -> None:
     assert card.policy_on.blocked_attacks == 10
     assert card.policy_off.blocked_attacks == 0
     assert card.policy_off.policy_block_rate == 0.0
+
+
+def test_control_ok_matches_displayed_asr_rounding() -> None:
+    """Gate must not PASS when printed ON/OFF ASR both show 0.0000."""
+    on = _metrics(asr=0.0, policy_enabled=True)
+    off = _metrics(asr=0.00004, policy_enabled=False, policy_block_rate=0.0)
+    card = build_card(
+        on=on,
+        off=off,
+        package_version="x",
+        git_sha="y",
+        generated_at=datetime(2026, 10, 8, tzinfo=UTC),
+    )
+    assert card.control_ok is False
+    assert round_asr(card.policy_on.asr) == round_asr(card.policy_off.asr) == 0.0
+    assert "0.0000" in render_markdown(card)
+    assert "Gate:** `FAIL`" in render_markdown(card)
 
 
 def test_build_card_fails_flags_when_asr_nonzero_or_control_flat() -> None:

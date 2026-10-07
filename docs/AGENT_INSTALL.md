@@ -202,7 +202,7 @@ Generate a citable ON+OFF scorecard after install:
 containment-eval-card --suite fixtures --out-dir artifacts/eval-card
 ```
 
-Expect exit 0 with `on_asr_ok` (ON ASR 0.0000) and `control_ok` (OFF ASR worse).
+Expect exit 0 with `on_asr_ok` (ON ASR 0.0000) and `control_ok` (OFF ASR worse after 4-decimal rounding).
 Artifacts land under `artifacts/eval-card/` (gitignored). Details:
 [EVAL_CARD.md](EVAL_CARD.md). This is fixture-only offline evidence — not a
 public leaderboard. `release_gate.sh` still runs a single policy-ON eval; the

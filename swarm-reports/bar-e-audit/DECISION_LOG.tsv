@@ -1,0 +1,10 @@
+ts	phase	decision	why	evidence	result
+2026-10-08T01:26:47+09:00	frame	locked BAR_E_AUDIT_HARDEN_PLAN.md as law	K asked poteto+swarm Bar E plan-match + integrity harden; mirror Bar C+D local swarm	BAR_E_AUDIT_HARDEN_PLAN.md	plan written
+2026-10-08T01:26:47+09:00	frame	use local N=4 executors not cloud swarm	standing box-only rule (no Cloud Agents unless K asks); swarm skill cloud default overridden	memory standing rule + BAR_E plan non-goals	local swarm
+2026-10-08T01:27:46+09:00	baseline	recorded gate+pytest+eval+card smoke	law step 1 before swarm	SHA d025cf2; 304 passed; ASR 0.0000; card gate=PASS	VERIFIED
+2026-10-08T01:29:00+09:00	swarm	local N=4 slices A-D written	box-only standing rule; mirror bar-cd-audit	SWARM_AGGREGATE E1+X1+X2	ISSUES
+2026-10-08T01:29:10+09:00	plan-match	wrote AUDIT_PLAN_VS_BAR_E.md	law step 3; GAP=E1+X1+X2	matrix PASS4 GAP1 + docs2	VERIFIED
+2026-10-08T01:29:50+09:00	fix-E	control_is_ok uses round_asr	E1 displayed ASR coherence	test_eval_card 12 passed	VERIFIED
+2026-10-08T01:29:50+09:00	fix-X	ARCHITECTURE+README name eval_card; docs scrub	X1/X2 + E1 wording	DECISIONS append 1.6.1	VERIFIED
+2026-10-08T01:30:08+09:00	integrity	E1 repro FAIL gate; 12 tests; ruff clean	step 6 lock findings	aggregate+AUDIT cleared	VERIFIED
+2026-10-08T01:30:47+09:00	prove-it	bump 1.6.1; gate 305 passed; card PASS	E1 behavior change requires bump	ASR 0.0000 unchanged	VERIFIED-pre-push
