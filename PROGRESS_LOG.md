@@ -1915,3 +1915,12 @@ Bar D Steps 2–6 complete → version **1.5.0**. release_gate OK. Push `origin/
 - `isolation_declared` honor system; live Moltbook optional behind env flag
 
 ### Verdict: VERIFIED (pre-push; gate run next)
+
+## Reference Host (Bar D) — Step 7 post-push — 2026-10-07 23:12 JST
+
+### Push evidence
+- `origin/main` HEAD: `fc3c77d`
+- Version: **1.5.0**
+- release_gate OK; 287 passed, 2 skipped; ASR=0.0000
+
+### Verdict: VERIFIED (Bar D complete)
