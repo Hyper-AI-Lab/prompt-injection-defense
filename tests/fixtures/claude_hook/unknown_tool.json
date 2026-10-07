@@ -1,0 +1,8 @@
+{
+  "hook_event_name": "PreToolUse",
+  "tool_name": "NotebookEdit",
+  "tool_input": {"notebook_path": "x.ipynb"},
+  "tool_use_id": "tu_unk_1",
+  "session_id": "sess_test",
+  "cwd": "/tmp"
+}

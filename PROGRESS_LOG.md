@@ -1610,3 +1610,145 @@ Behavior fixes from audit steps 4–7 → version **1.3.1**. release_gate OK. Pu
 - release_gate OK; 259 passed, 2 skipped; ASR=0.0000
 
 ### Verdict: VERIFIED (audit harden complete)
+
+---
+
+## Runtime Adapter (Bar C) — Plan + Baseline — 2026-10-07 22:53 JST
+
+### What was done
+- Wrote `RUNTIME_ADAPTER_PLAN.md` as law (BrokeredRegistry + OpenAI-style wrapper + Claude Code PreToolUse CLI → 1.4.0).
+- Baseline: no code changes yet.
+
+### Verify
+```bash
+./scripts/release_gate.sh
+# 259 passed, 2 skipped; ASR=0.0000 FPR=0.0278; release_gate OK
+# HEAD 3e57e8c; containment.__version__ == 1.3.1
+```
+
+### Verdict: VERIFIED
+
+## Runtime Adapter (Bar C) — Step 2 BrokeredRegistry — 2026-10-07 22:54 JST
+
+### What was done
+- Created `src/containment/adapters/` package
+- `registry.py`: `BrokeredRegistry` — register name→callable; `call()` builds
+  `ProposedAction`, runs only via `ToolBroker.secure_execute` with a temporary
+  executor; unknown name → `SecurityViolation` (`unknown_registry_tool`);
+  privileged sinks (`PRIVILEGED_SINKS`) require non-empty `input_labels`;
+  optional `known_tools` sync on register; plan or plan-factory supported.
+- No public raw invoke path (`invoke_raw` / `get_fn` / `__getitem__` absent).
+- Tests: `tests/test_adapters_registry.py`
+
+### Verify
+```bash
+.venv/bin/pytest tests/test_adapters_registry.py -q
+# 7 passed
+.venv/bin/ruff check src/containment/adapters/ tests/test_adapters_registry.py
+```
+
+### Verdict: VERIFIED
+
+## Runtime Adapter (Bar C) — Step 3 OpenAI brokered_tool — 2026-10-07 22:55 JST
+
+### What was done
+- `src/containment/adapters/openai_tools.py`: `brokered_tool(registry, name=None, *, tool=None)`
+  decorator — registers on decorate; wrapper keyword-only; strips
+  `_input_labels` / `_plan_step` / `_principal` / `_task_id` / `_reason_code` /
+  `_plan` then calls `registry.call` only (no raw fn path).
+- Exported from `containment.adapters`.
+- Tests: `tests/test_adapters_openai.py` (allow, deny→SecurityViolation, positional reject).
+
+### Verify
+```bash
+.venv/bin/pytest tests/test_adapters_openai.py -q
+# 3 passed
+```
+
+### Verdict: VERIFIED
+
+## Runtime Adapter (Bar C) — Step 4 Claude PreToolUse hook — 2026-10-07 22:56 JST
+
+### What was done
+- `src/containment/adapters/claude_hook.py`:
+  - Map Bash→`shell.exec`, Write|Edit→`fs.write`, Read→`fs.read`; unmapped→deny
+  - `handle_pretool_use` → `hookSpecificOutput.permissionDecision` allow|deny|ask
+  - `require_human` → ask; SecurityViolation/deny → deny; allow → allow
+  - CLI `main()`: stdin JSON → stdout decision JSON (exit 0); exit 2 only if JSON emit fails
+  - Env: `CONTAINMENT_POLICY`, `CONTAINMENT_AUDIT`, `CONTAINMENT_CAPABILITY_SECRET`,
+    `CONTAINMENT_PRINCIPAL`; flags `--policy` / `--audit` / `--principal`
+- `policies/claude_code_hooks.yaml` (explicit deny for mapped tools; default deny)
+- `pyproject.toml` script: `containment-claude-hook`
+- Fixtures under `tests/fixtures/claude_hook/`; tests `tests/test_adapters_claude_hook.py`
+
+### Verify
+```bash
+.venv/bin/pytest tests/test_adapters_claude_hook.py -q
+# 8 passed
+```
+
+### Verdict: VERIFIED
+
+## Runtime Adapter (Bar C) — Step 5 Docs + exports — 2026-10-07 22:56 JST
+
+### What was done
+- `docs/RUNTIME_ADAPTER.md` — BrokeredRegistry, brokered_tool, Claude hook map,
+  env vars, sample `.claude/settings.json`, residuals (install≠wired; hooks
+  disableable).
+- README Bar C blurb + link; `docs/AGENT_INSTALL.md` §9; DECISIONS ADOPT note;
+  SKILL (repo + workflow) runtime-adapters paragraph.
+- Exports: `containment` and `containment.adapters` expose `BrokeredRegistry`,
+  `brokered_tool`, `handle_pretool_use`, `map_claude_tool`, `default_claude_plan`.
+- Version left at **1.3.1** (parent owns Step 6 bump/push).
+
+### Verify
+```bash
+./scripts/release_gate.sh
+# ruff clean; 277 passed, 2 skipped; ASR=0.0000 FPR=0.0278 utility=0.9722
+# release_gate: OK; version 1.3.1
+```
+
+### New files
+- `src/containment/adapters/__init__.py`
+- `src/containment/adapters/registry.py`
+- `src/containment/adapters/openai_tools.py`
+- `src/containment/adapters/claude_hook.py`
+- `tests/test_adapters_registry.py`
+- `tests/test_adapters_openai.py`
+- `tests/test_adapters_claude_hook.py`
+- `tests/fixtures/claude_hook/bash_rm.json`
+- `tests/fixtures/claude_hook/unknown_tool.json`
+- `policies/claude_code_hooks.yaml`
+- `docs/RUNTIME_ADAPTER.md`
+- `RUNTIME_ADAPTER_PLAN.md` (Step 1)
+
+### Changed
+- `pyproject.toml` (script `containment-claude-hook`)
+- `src/containment/__init__.py` (exports; version unchanged)
+- `README.md`, `docs/AGENT_INSTALL.md`, `DECISIONS.md`, `SKILL.md`
+- `/home/box/agent-data/workflows/containment-untrusted-content/SKILL.md`
+- `PROGRESS_LOG.md`
+
+### Residuals (accepted)
+- Claude hooks not auto-wired; user can disable hooks (host-config).
+- Mapped `fs.write`/`fs.read` not in `PRIVILEGED_SINKS` (only `file.write`);
+  default-deny still denies; hosts should add explicit rules if allowing.
+
+### Verdict: VERIFIED (Steps 2–5 complete; Step 6 deferred to parent)
+
+---
+
+## Runtime Adapter (Bar C) — Step 6 Final prove-it — 2026-10-07 22:58 JST
+
+### Scope
+Bar C Steps 2–5 complete → version **1.4.0**. release_gate OK. Push `origin/main`.
+
+### Changes
+- `pyproject.toml` / `containment.__version__` → **1.4.0**
+- Ship: BrokeredRegistry, brokered_tool, containment-claude-hook, docs/RUNTIME_ADAPTER.md
+
+### Residuals (accepted)
+- Install ≠ wired Claude hooks; users can disable hooks
+- `fs.write`/`fs.read` not in `PRIVILEGED_SINKS`; default-deny still denies
+
+### Verdict: VERIFIED (pre-push; gate run next)

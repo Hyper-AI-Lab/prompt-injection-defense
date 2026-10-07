@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "containment"
-version = "1.3.1"
+version = "1.4.0"
 description = "Production prompt-injection defense kit: labels, policy, broker, ingest, detectors"
 readme = "README.md"
 license = "Apache-2.0"
@@ -33,6 +33,7 @@ Issues = "https://github.com/Hyper-AI-Lab/prompt-injection-defense/issues"
 [project.scripts]
 containment = "containment.cli:main"
 containment-egress-proxy = "containment.egress_proxy:main"
+containment-claude-hook = "containment.adapters.claude_hook:main"
 
 [project.optional-dependencies]
 dev = [

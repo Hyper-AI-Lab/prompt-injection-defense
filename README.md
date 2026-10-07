@@ -28,6 +28,13 @@ Enterprise hosts should use `build_enterprise_host()` plus
 Ed25519 (`[crypto]`), Redis consume store (`[redis]`), and `RateLimitGate`.
 This is not a FedRAMP claim and not an OS sandbox.
 
+## Runtime adapters (Bar C)
+
+Wire agent runtimes through the same broker: `BrokeredRegistry`, OpenAI-style
+`brokered_tool`, and Claude Code PreToolUse CLI (`containment-claude-hook`).
+See [docs/RUNTIME_ADAPTER.md](docs/RUNTIME_ADAPTER.md). Install does not auto-wire
+host hooks; users can disable Claude hooks (host-config residual).
+
 ## Install
 
 Python 3.12+ recommended. PyPI package name is `containment`.

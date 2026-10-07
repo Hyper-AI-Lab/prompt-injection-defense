@@ -162,3 +162,18 @@ declare and wire controls. Full recipe: [HOST_HARDENING.md](HOST_HARDENING.md).
 
 Under `enterprise_profile` / `require_host_gate`, incomplete `HostChecklist`
 fails closed before capability mint.
+
+## 9. Runtime adapters (Bar C)
+
+Use [RUNTIME_ADAPTER.md](RUNTIME_ADAPTER.md) when the agent runtime exposes tools
+outside direct `ProposedAction` construction:
+
+1. **`BrokeredRegistry`** — `register(name, fn)` then `call(name, args, input_labels=…)`;
+   every invoke goes through `ToolBroker.secure_execute`.
+2. **`brokered_tool(registry)`** — decorator for OpenAI-style tool functions.
+3. **`containment-claude-hook`** — Claude Code PreToolUse stdin/stdout CLI; set
+   `CONTAINMENT_POLICY` (and ideally `CONTAINMENT_CAPABILITY_SECRET` /
+   `CONTAINMENT_AUDIT`). Sample settings snippet is in RUNTIME_ADAPTER.md.
+
+Residuals: package install does not enable Claude hooks; users may disable hooks
+in host settings.

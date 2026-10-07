@@ -1,6 +1,13 @@
 """containment — production prompt-injection defense kit."""
 
 from containment.actions import PolicyDecision, ProposedAction, TraceEvent
+from containment.adapters import (
+    BrokeredRegistry,
+    brokered_tool,
+    default_claude_plan,
+    handle_pretool_use,
+    map_claude_tool,
+)
 from containment.audit import AuditLog
 from containment.broker import BrokerResult, SecurityViolation, ToolBroker
 from containment.capability import CapabilityError, CapabilityMinter, CapabilityToken
@@ -67,13 +74,18 @@ from containment.url_guard import (
     parse_egress_url,
 )
 
-__version__ = "1.3.1"
+__version__ = "1.4.0"
 
 __all__ = [
     "ALLOWLIST_SUMMARY_SCHEMA",
     "AuditLog",
     "AuditShipper",
     "BrokerResult",
+    "BrokeredRegistry",
+    "brokered_tool",
+    "default_claude_plan",
+    "handle_pretool_use",
+    "map_claude_tool",
     "CapabilityError",
     "CapabilityMinter",
     "CapabilityToken",

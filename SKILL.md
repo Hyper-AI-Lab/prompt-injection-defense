@@ -68,6 +68,11 @@ CI stay offline.
 3. Call `broker.secure_execute`; on `SecurityViolation`, stop and explain the deny.
 4. On `require_human`, show resolved recipient/subject/body/sources and wait for explicit approval.
 
+
+## Runtime adapters
+
+Prefer `BrokeredRegistry` / `brokered_tool` so every tool invoke hits `secure_execute`. For Claude Code, wire `containment-claude-hook` as a PreToolUse command (see `docs/RUNTIME_ADAPTER.md`); install does not auto-enable hooks and users can disable them.
+
 ## Eval honesty
 
 ```bash

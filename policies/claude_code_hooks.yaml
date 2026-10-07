@@ -1,0 +1,21 @@
+# Claude Code PreToolUse companion policy.
+# Mapped tools (shell.exec / fs.write / fs.read) have no allow rules → default deny.
+# Hosts that need limited allow/require_human should add explicit rules.
+version: 1
+default: deny
+
+rules:
+  - id: claude-deny-shell
+    effect: deny
+    tool: shell.exec
+    when: {}
+
+  - id: claude-deny-fs-write
+    effect: deny
+    tool: fs.write
+    when: {}
+
+  - id: claude-deny-fs-read
+    effect: deny
+    tool: fs.read
+    when: {}

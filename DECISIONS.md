@@ -286,3 +286,19 @@ FedRAMP/SOC2 claims; zero residual when host skips checklist/proxy/isolation.
 ### Accepted residuals
 - Rate limit still optional on enterprise compose.
 - `isolation_declared` honor system; opener DI; proxy-wins-over-pin.
+
+---
+
+## 2026-10-07 — Runtime adapters Bar C (→ 1.4.0)
+
+### BrokeredRegistry + brokered_tool + Claude PreToolUse — **ADOPT**
+- In-process `BrokeredRegistry`: register name→callable; invoke only via
+  `ToolBroker.secure_execute`; unknown deny; privileged sinks need labels.
+- `brokered_tool` decorator for OpenAI-style wrappers (no full OpenAI SDK).
+- `containment-claude-hook` CLI maps Bash|Write|Edit|Read → containment tools;
+  `permissionDecision` allow|deny|ask; fail closed on unmapped/malformed.
+- Docs: `docs/RUNTIME_ADAPTER.md`. Version bump to 1.4.0 deferred to final prove-it.
+
+### Explicit non-goals
+LangGraph-only plugin; full MCP server product; auto-install into Claude without
+user settings; claiming hooks cannot be disabled by the host.
