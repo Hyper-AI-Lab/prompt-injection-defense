@@ -35,6 +35,17 @@ Wire agent runtimes through the same broker: `BrokeredRegistry`, OpenAI-style
 See [docs/RUNTIME_ADAPTER.md](docs/RUNTIME_ADAPTER.md). Install does not auto-wire
 host hooks; users can disable Claude hooks (host-config residual).
 
+## Reference host demo (Bar D)
+
+Runnable end-to-end wiring: `containment-reference-host` exercises attack deny,
+benign allow, and require_human approval against `build_enterprise_host` +
+`BrokeredRegistry` (offline by default). See
+[docs/REFERENCE_HOST.md](docs/REFERENCE_HOST.md).
+
+```bash
+containment-reference-host --scenario all
+```
+
 ## Install
 
 Python 3.12+ recommended. PyPI package name is `containment`.

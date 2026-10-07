@@ -177,3 +177,19 @@ outside direct `ProposedAction` construction:
 
 Residuals: package install does not enable Claude hooks; users may disable hooks
 in host settings.
+
+## 10. Reference host demo (Bar D)
+
+Run the hermetic end-to-end host before wiring your own agent:
+
+```bash
+containment-reference-host --scenario all
+```
+
+This uses `build_enterprise_host` (secrets under a work dir, HostGate, signed
+intents), `BrokeredRegistry`, and ingest. Paths: attack → `no-tainted-egress`
+deny; benign → `web.fetch` allow; human → `require_human` then approval hook.
+Details: [REFERENCE_HOST.md](REFERENCE_HOST.md). Live Moltbook is optional
+(`CONTAINMENT_LIVE_MOLTBOOK=1` + `--live-moltbook`); CI stays offline.
+`isolation_declared` in the demo is honor-system — production hosts must
+actually isolate (see §8 / HOST_HARDENING.md).

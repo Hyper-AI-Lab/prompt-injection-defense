@@ -302,3 +302,20 @@ FedRAMP/SOC2 claims; zero residual when host skips checklist/proxy/isolation.
 ### Explicit non-goals
 LangGraph-only plugin; full MCP server product; auto-install into Claude without
 user settings; claiming hooks cannot be disabled by the host.
+
+---
+
+## 2026-10-07 — Reference host Bar D (→ 1.5.0)
+
+### Reference host demo — **ADOPT**
+- Package `containment.reference_host`: `build_reference_host`, hermetic
+  `web.fetch` / `email.send` stubs, signed-intent helper on enterprise compose.
+- Scenarios: attack deny (`no-tainted-egress`), benign allow (`read-public-web`),
+  human `require_human` + approval hook.
+- CLI `containment-reference-host` (offline default; optional live Moltbook
+  behind `CONTAINMENT_LIVE_MOLTBOOK=1`).
+- Docs: `docs/REFERENCE_HOST.md`. Version bump to 1.5.0 deferred to final prove-it.
+
+### Explicit non-goals
+Eval card / release ritual / bot playbook; auto-wire Claude.app; LLM round-trips
+in CI; claiming OS isolation from `isolation_declared=True`.

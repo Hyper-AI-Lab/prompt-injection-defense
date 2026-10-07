@@ -73,6 +73,10 @@ CI stay offline.
 
 Prefer `BrokeredRegistry` / `brokered_tool` so every tool invoke hits `secure_execute`. For Claude Code, wire `containment-claude-hook` as a PreToolUse command (see `docs/RUNTIME_ADAPTER.md`); install does not auto-enable hooks and users can disable them.
 
+## Reference host
+
+Before inventing a custom host, run `containment-reference-host --scenario all` (see `docs/REFERENCE_HOST.md`). It is the wiring recipe: enterprise compose + signed intents + BrokeredRegistry + ingest. Attack must deny; benign fetch allow; email.send must require human approval.
+
 ## Eval honesty
 
 ```bash
@@ -88,5 +92,7 @@ Report measured ASR / FPR / utility; do not claim certification or zero residual
 - `docs/ARCHITECTURE.md`
 - `docs/AGENT_INSTALL.md`
 - `docs/HOST_HARDENING.md`
+- `docs/REFERENCE_HOST.md`
+- `docs/RUNTIME_ADAPTER.md`
 - `docs/OWASP_LLM_TOP10_MAP.md`
 - `policies/default_deny.yaml`

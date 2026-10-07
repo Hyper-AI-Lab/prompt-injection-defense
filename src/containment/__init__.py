@@ -67,6 +67,16 @@ from containment.quarantine import (
     closed_object_schema,
     extract,
 )
+from containment.reference_host import (
+    ReferenceHost,
+    ReferenceHostConfig,
+    ScenarioResult,
+    build_reference_host,
+    run_all,
+    run_attack,
+    run_benign,
+    run_human,
+)
 from containment.url_guard import (
     ParsedEgressUrl,
     UrlGuardError,
@@ -74,7 +84,7 @@ from containment.url_guard import (
     parse_egress_url,
 )
 
-__version__ = "1.4.0"
+__version__ = "1.5.0"
 
 __all__ = [
     "ALLOWLIST_SUMMARY_SCHEMA",
@@ -139,6 +149,14 @@ __all__ = [
     "UrlGuardError",
     "__version__",
     "build_enterprise_host",
+    "run_human",
+    "run_benign",
+    "run_attack",
+    "run_all",
+    "build_reference_host",
+    "ScenarioResult",
+    "ReferenceHostConfig",
+    "ReferenceHost",
     "check_url_for_tool",
     "closed_object_schema",
     "extract",

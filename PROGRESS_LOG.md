@@ -1761,3 +1761,157 @@ Bar C Steps 2–5 complete → version **1.4.0**. release_gate OK. Push `origin/
 - release_gate OK; 277 passed, 2 skipped; ASR=0.0000 FPR=0.0278
 
 ### Verdict: VERIFIED (Bar C complete)
+
+---
+
+## Reference Host (Bar D) — Plan + Baseline — 2026-10-07 23:07 JST
+
+### What was done
+- Wrote `REFERENCE_HOST_PLAN.md` as law (reference host demo → 1.5.0).
+- Baseline: no code changes yet.
+
+### Verify
+```bash
+./scripts/release_gate.sh
+# 277 passed, 2 skipped; ASR=0.0000 FPR=0.0278; release_gate OK
+# HEAD 4d2b6ae; containment.__version__ == 1.4.0
+```
+
+### Verdict: VERIFIED
+
+---
+
+## Reference Host (Bar D) — Step 2 Fixtures + core — 2026-10-07 23:09 JST
+
+### What was done
+- Created `src/containment/reference_host/` with `host.py` + fixtures.
+- `ReferenceHostConfig` / `build_reference_host(work_dir)`: enterprise compose
+  (secrets, HostGate, signed intents), Plan, BrokeredRegistry, hermetic
+  `web.fetch` / `email.send` stubs, signed-intent helper.
+- Fixtures: `attack_inject.txt`, `benign_note.txt` (also mirrored under
+  `tests/fixtures/reference_host/`).
+- Wheel force-include for fixture texts.
+
+### Verify
+```bash
+.venv/bin/python -c "from containment.reference_host import build_reference_host; ..."
+# STEP2_OK: checklist ok; registry tools; hermetic fetch allow
+```
+
+### Verdict: VERIFIED
+
+---
+
+## Reference Host (Bar D) — Step 3 Scenarios — 2026-10-07 23:09 JST
+
+### What was done
+- Added `scenarios.py`: `ScenarioResult`, `run_attack`, `run_benign`,
+  `run_human`, `run_all`.
+- Attack: ingest untrusted fixture → email.send → deny `no-tainted-egress` +
+  audit assert; stub never runs.
+- Benign: trusted labels → web.fetch https://example.com → allow
+  `read-public-web` + hermetic stub body.
+- Human: trusted email.send → require_human without hook fails closed; with
+  `approve_all` hook allows; audit has `approved-email`.
+
+### Verify
+```bash
+.venv/bin/python -c "from containment.reference_host import run_all; ..."
+# attack/benign/human all ok — STEP3_OK
+```
+
+### Verdict: VERIFIED
+
+---
+
+## Reference Host (Bar D) — Step 4 CLI — 2026-10-07 23:10 JST
+
+### What was done
+- Added `cli.py` + `main()`: `--work-dir`, `--scenario attack|benign|human|all`,
+  optional `--live-moltbook` (requires `CONTAINMENT_LIVE_MOLTBOOK=1`, fail closed).
+- Wired `[project.scripts] containment-reference-host`.
+
+### Verify
+```bash
+containment-reference-host --scenario all   # exit 0; 3 PASS
+containment-reference-host --live-moltbook  # exit 2 without env
+```
+
+### Verdict: VERIFIED
+
+---
+
+## Reference Host (Bar D) — Step 5 Tests — 2026-10-07 23:10 JST
+
+### What was done
+- Added `tests/test_reference_host.py`: attack deny, benign allow, human
+  approval path, `run_all`, CLI exit 0, live refused without env, direct host
+  asserts, urllib monkeypatch offline guard.
+
+### Verify
+```bash
+.venv/bin/pytest tests/test_reference_host.py -q
+# 10 passed
+```
+
+### Verdict: VERIFIED
+
+---
+
+## Reference Host (Bar D) — Step 6 Docs + exports — 2026-10-07 23:11 JST
+
+### What was done
+- Docs: `docs/REFERENCE_HOST.md`; README Bar D blurb; AGENT_INSTALL §10;
+  DECISIONS ADOPT; SKILL + workflow SKILL paragraphs.
+- Exports from `containment` / `containment.reference_host`.
+- Script `containment-reference-host`; hatch force-include for fixtures.
+- Version left at **1.4.0** (parent owns Step 7 bump/push).
+
+### Verify
+```bash
+./scripts/release_gate.sh
+# ruff clean; 287 passed, 2 skipped; ASR=0.0000 FPR=0.0278 utility=0.9722
+# release_gate: OK; version 1.4.0
+```
+
+### New files
+- `src/containment/reference_host/__init__.py`
+- `src/containment/reference_host/host.py`
+- `src/containment/reference_host/scenarios.py`
+- `src/containment/reference_host/cli.py`
+- `src/containment/reference_host/fixtures/attack_inject.txt`
+- `src/containment/reference_host/fixtures/benign_note.txt`
+- `tests/fixtures/reference_host/attack_inject.txt`
+- `tests/fixtures/reference_host/benign_note.txt`
+- `tests/test_reference_host.py`
+- `docs/REFERENCE_HOST.md`
+- `REFERENCE_HOST_PLAN.md` (Step 1)
+
+### Changed
+- `pyproject.toml` (script + force-include; version unchanged 1.4.0)
+- `src/containment/__init__.py` (exports; version 1.4.0)
+- `README.md`, `docs/AGENT_INSTALL.md`, `DECISIONS.md`, `SKILL.md`
+- `/home/box/agent-data/workflows/containment-untrusted-content/SKILL.md`
+- `PROGRESS_LOG.md`
+
+### Residuals (accepted)
+- `isolation_declared` honor-system in demo
+- Live Moltbook optional / off by default
+- Claude.app hooks not auto-wired (documented)
+
+### Verdict: VERIFIED (Steps 2–6 complete; Step 7 deferred to parent)
+
+---
+
+## Reference Host (Bar D) — Step 7 Final prove-it — 2026-10-07 23:12 JST
+
+### Scope
+Bar D Steps 2–6 complete → version **1.5.0**. release_gate OK. Push `origin/main`.
+
+### Smoke
+- `containment-reference-host --scenario all`: attack/benign/human all PASS
+
+### Residuals (accepted)
+- `isolation_declared` honor system; live Moltbook optional behind env flag
+
+### Verdict: VERIFIED (pre-push; gate run next)

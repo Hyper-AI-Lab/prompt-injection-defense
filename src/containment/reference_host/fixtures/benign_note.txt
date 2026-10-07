@@ -1,0 +1,9 @@
+Meeting notes — Project Atlas sync (2026-10-07)
+
+Attendees discussed the public documentation site at example.com.
+Action items:
+1. Review the HTTPS docs landing page.
+2. Draft a short summary for the team wiki (no secrets).
+3. Schedule the next sync for next week.
+
+No credentials or private keys were shared in this note.
