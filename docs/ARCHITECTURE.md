@@ -42,7 +42,9 @@ untrusted bytes
 | `datamark` | random marker wrap/unwrap |
 | `ingest` | wires label → cascade → quarantine |
 | `moltbook` | public posts client → ingest → `{title,topic,summary}` |
-| `cli` / `eval_runner` | offline ASR/FPR/utility |
+| `cli` / `eval_runner` | `containment eval` (offline ASR/FPR/utility) and `containment doctor` |
+| `doctor` | Bar G: offline install + host wiring report from `HostChecklist` + `build_enterprise_host`; JSON/human; exit 0/1/2 |
+| `resources` | locate shipped `policies/` + `fixtures/` (wheel `containment/_data/` or checkout) |
 | `eval_card` | Bar E: citable ON+OFF Markdown/JSON scorecard; fail-closed CLI; reuses `run_eval` |
 | `adapters` | Bar C: `BrokeredRegistry`, `brokered_tool`, Claude PreToolUse hook CLI |
 | `reference_host` | Bar D: enterprise compose demo; hermetic attack/benign/human scenarios |
@@ -59,3 +61,9 @@ untrusted bytes
 `fetch_posts` (stdlib urllib, no auth) → per-post `ingest` with
 `MOLTBOOK_SUMMARY_SCHEMA` → only `title`, `topic`, `summary` may survive.
 All posts labeled untrusted. No tools are exposed inside the reader.
+
+## Release path
+
+`scripts/cut_release.sh` (fail-closed preflight + tag) → `.github/workflows/publish.yml`
+(build once, `actions/attest` provenance; PyPI job opt-in) → GitHub Release with CHANGELOG
+notes, attested wheel + sdist and the eval card. Runbook: [RELEASE.md](RELEASE.md).

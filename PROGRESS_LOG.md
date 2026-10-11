@@ -2413,3 +2413,149 @@ Confirm `origin/main` carries **containment 1.6.1** after Bar E audit harden.
 Matrix written; swarm aggregated; integrity surfaces clean; release_gate OK; **1.6.1** on origin/main.
 
 ### Verdict: VERIFIED
+
+## Release + Playbook — Step 1 Baseline — 2026-10-11 JST
+
+### Scope
+Law step 1 of `RELEASE_AND_PLAYBOOK_PLAN.md` (K approved 2026-10-11; GitHub-only release, Gate G0 not satisfied). No code.
+
+### Evidence
+- HEAD = origin/main = `aa788ca`; version pyproject + `__version__` = **1.6.1**
+- `scripts/release_gate.sh` exit **0**: ruff clean; pytest **305 passed, 2 skipped**; ASR **0.0000**, FPR 0.0278, utility 0.9722, blocked 53/53; placeholder scan clean
+- `containment-eval-card --suite fixtures --out-dir /tmp/card_s1`: gate=PASS, ON ASR 0.0000, OFF ASR 1.0000, control_ok=True
+- Decision log started: `swarm-reports/release-playbook/DECISION_LOG.tsv`
+- Principles: prove-it-works (numbers before change), sequence-verifiable-units
+
+### Verdict: VERIFIED
+
+## Release + Playbook — Step 2 Changelog + release docs — 2026-10-11 JST
+
+### Scope
+Law step 2. `CHANGELOG.md` (1.0.0→1.6.1) + `docs/RELEASE.md` runbook.
+
+### Evidence
+- `CHANGELOG.md`: Keep a Changelog 1.1.0; entries 1.0.0–1.6.1 from release commit bodies + PROGRESS_LOG (no SOTA; fixture-suite scope stated); `[Unreleased]` lists 1.7.0 work so far; compare links
+- Release commits verified unambiguous: 10 `Release containment X.Y.Z` commits, `pyproject` + `__version__` == X.Y.Z at each (`git show <sha>:pyproject.toml`)
+- Annotated tags `v1.0.0`…`v1.6.1` created locally on those commits (committer date preserved); pushed at step 8; no GitHub Releases for old versions
+- `docs/RELEASE.md`: contents table, preflight, fail-closed check order (9 checks), `--execute` flow (tag → wait publish run → download dist → `gh attestation verify` → `gh release create --notes-file`), publish.yml jobs, consumer verify, PyPI G0 setup (pending publisher + env `pypi` + `PYPI_PUBLISH` var), history
+- Web check (git ls-remote 2026-10-11): checkout v7, setup-python v7, upload-artifact v7, download-artifact v8, actions/attest v4, pypi-publish release/v1
+- Unfinished-marker scan on new files: clean
+- Principles: prove-it-works (versions checked per commit), boundary-discipline (no PyPI claim)
+
+### Verdict: VERIFIED
+
+## Release + Playbook — Step 3 Cut-release script — 2026-10-11 JST
+
+### Scope
+Law step 3. `scripts/cut_release.sh` fail-closed; dry-run default; `--execute`.
+
+### Evidence
+- Checks in order: semver → pyproject/`__version__` sync → non-empty CHANGELOG section → tag absent locally → clean tree → HEAD==origin/main + tag absent on origin → `release_gate.sh` → `containment-eval-card` gate → local `python -m build`
+- `--execute`: annotated tag + push → find publish.yml run for the tag (≤300s) → `gh run watch --exit-status` → `gh run download -n dist` → `gh attestation verify` each wheel+sdist → `gh release create --verify-tag --notes-file` (CHANGELOG section) with dists + eval-card.md/json
+- Decision: release assets are the CI-attested dists (build once; a local rebuild would not match the attestation)
+- Box gh 2.46 lacked `gh attestation`; installed gh 2.102.0 to `~/.local/bin` (sha256 verified); script fails closed if `gh attestation verify` missing
+- `tests/test_cut_release.py`: **10 passed** (help, missing arg, unknown option, non-semver, pyproject mismatch, `__version__` mismatch, empty CHANGELOG section, local tag exists, dirty tree, missing origin before gate)
+- shellcheck (shellcheck-py) clean on `cut_release.sh` + `release_gate.sh`; ruff clean
+- Live smoke: `cut_release.sh 9.9.9` → version mismatch exit 1; `1.6.1` → tag exists exit 1. Full dry-run success path runs at step 8 on a clean tree.
+- Principles: fail-closed, test-behavior-not-implementation (literal messages), prove-it-works
+
+### Verdict: VERIFIED
+
+## Release + Playbook — Amendment A1 (during step 4) — 2026-10-11 JST
+
+### Why
+Step 4 requires `python -m build` sdist+wheel that a GitHub-only consumer installs. Local build proved two shipped-artifact bugs that would make the release assets poor:
+1. Wheel build **fails** on current hatchling: `force-include` of `src/containment/reference_host/fixtures` duplicates files already under `packages` (`ValueError: A second file is being added ... attack_inject.txt`). CI never built a wheel (editable install only), so this was latent.
+2. A wheel install cannot find `policies/default_deny.yaml` or `fixtures/` (repo-relative paths): `containment eval`, `containment-eval-card`, `containment-reference-host` all raise `FileNotFoundError` outside a checkout; `containment-claude-hook` denies with "missing policy".
+
+### Amendment (one solution, inside step 4)
+Drop the duplicate force-include; ship `policies/` and `fixtures/` in the wheel as `containment/_data/{policies,fixtures}`; one resolver `containment.resources.data_path()` (packaged data first, checkout fallback) used by `eval_runner`, `reference_host.host`, `adapters.claude_hook`. Prove with a clean-venv wheel install running eval, eval card, reference host. No other scope added.
+
+## Release + Playbook — Step 4 Publish workflow — 2026-10-11 JST
+
+### Scope
+Law step 4 (+ Amendment A1 logged above).
+
+### Evidence
+- `.github/workflows/publish.yml`: `on: push tags v*` + `workflow_dispatch` (build-only check); top-level `permissions: {}`
+  - **build**: checkout@v7 (`persist-credentials: false`), setup-python@v7 3.12, tag==pyproject==`__version__` assert (tag runs), `python -m build` once, `twine check --strict`, `actions/attest@v4` provenance on `dist/*`, upload-artifact@v7 `dist`; perms `contents: read`, `id-token: write`, `attestations: write`
+  - **publish**: `needs: build`, `if: startsWith(github.ref, 'refs/tags/v') && vars.PYPI_PUBLISH == 'true'`, environment `pypi` (url pypi.org/project/containment), perm `id-token: write` only, download-artifact@v8 (no rebuild), `pypa/gh-action-pypi-publish@release/v1` (Trusted Publishing; PEP 740 attestations default). `PYPI_PUBLISH` unset → skipped.
+- actionlint clean (publish + ci); zizmor --offline: only `unpinned-uses` (major-tag pins kept per K spec + Dependabot; residual)
+- A1: wheel build fixed (duplicate force-include removed); `policies/` + `fixtures/` shipped as `containment/_data/`; `src/containment/resources.py` used by `eval_runner`, `reference_host.host`, `adapters.claude_hook`; `tests/test_resources.py` (3)
+- Clean-venv wheel prove-it (outside checkout): `containment eval` ASR 0.0000 53/53 blocked; `containment-eval-card` gate=PASS; `containment-reference-host --scenario all` 3/3 PASS; `containment-claude-hook` loads packaged policy (default-deny decision, not "missing policy"); `twine check --strict` PASSED both dists
+- `ci.yml`: new "Wheel smoke" step (build → fresh venv → eval, eval card, reference host); local emulation exit 0
+- `release_gate.sh` exit 0: **318 passed, 2 skipped**; ASR 0.0000
+- Live GitHub run of publish.yml: verified at step 8 via `workflow_dispatch` on main before tagging
+- Principles: build-once, least-privilege, encode-lessons-in-structure (CI wheel smoke), prove-it-works
+
+### Verdict: VERIFIED
+
+## Release + Playbook — Step 5 Bot playbook + skills — 2026-10-11 JST
+
+### Scope
+Law step 5. Playbook, both skills, AGENT_INSTALL/README cross-links, DECISIONS F+G.
+
+### Evidence
+- `docs/BOT_PLAYBOOK.md`: §0 version → §1 install (attested wheel via `gh release download` + `gh attestation verify`, or `@v1.7.0` git pin) → §2 policy table → §3 ingest (+ Moltbook, PIGuard opt-in) → §4 plan-before-read → §5 `build_enterprise_host` + `BrokeredRegistry` + signed `IntentEnvelope` + approval hook + adapters → §6 reference host → §7 doctor (flags, exit codes 0/1/2, `--json`) → §8 host-owned residuals → §9 eval card → §10 upgrade
+- Example executed against the venv before landing: untrusted → deny `no-tainted-egress`; fetch allow; email → `require_human approved-email`; approval hook → sent
+- `tests/test_bot_playbook.py`: **3 passed** (locks the example + doc needles)
+- Repo `SKILL.md`: pinned `@v1.7.0` install + `doctor --install-only`; new "Host check" section; references lead with BOT_PLAYBOOK / RELEASE / CHANGELOG
+- Box skill `/home/box/agent-data/workflows/containment-untrusted-content/SKILL.md` rewritten: v1.7.0 pin, attested-wheel alt, broker/registry/signed intent, Claude hook, reference host, doctor, eval card; frontmatter parses (`name` valid, description 275 chars)
+- `README.md`: install says GitHub Releases, **not on PyPI**; layout adds doctor/resources/scripts/CHANGELOG; new Releases section; CI line names wheel smoke
+- `docs/AGENT_INSTALL.md`: playbook pointer, pinned install, new §12 Host doctor
+- `docs/REFERENCE_HOST.md`: policy packaging paragraph matches A1 (policy shipped in wheel)
+- `DECISIONS.md`: appended "Release ritual Bar F + bot playbook Bar G (→ 1.7.0)" ADOPT + residuals + non-goals
+- `release_gate.sh` exit 0: **321 passed, 2 skipped**; ASR 0.0000; unfinished-marker scan clean
+- Doctor documented here, implemented in step 6 (law order); step 7 slice B/C checks doc ↔ code match
+- Principles: prove-it-works (example executed + test), encode-lessons-in-structure, boundary-discipline (honest residuals)
+
+### Verdict: VERIFIED
+
+## Release + Playbook — Step 6 Doctor CLI — 2026-10-11 JST
+
+### Scope
+Law step 6. `containment doctor` subcommand, hermetic, reusing host types.
+
+### Evidence
+- Data shape named first (`src/containment/doctor.py`): `DoctorConfig` (settings as passed to `build_enterprise_host`; rejects conflicting secrets/egress) → `DoctorCheck(id, required, status pass|fail|skip, detail, fix)` → `DoctorReport(version, scope install|host, checks, checklist_failures, residuals)` with `ok` / `exit_code`
+- Reuse: settings → `FileSecretProvider`/`EnvSecretProvider`, `ProxyEgressProvider`/`PinnedEgressProvider`, `FileAuditShipper` → `HostChecklist`; `failures()` codes reported verbatim; `host.compose` calls `build_enterprise_host` with a temp audit log (no writes to the ship destination); egress env defaults reuse `moltbook.PINNED_ENV` / `PROXY_ENV`
+- Checks: install.package, install.policy, host.isolation, host.secret_provider, host.egress (proxy URL shape), host.audit_shipper (writable target), host.secrets (capability + intent load; values never printed), host.compose; optional extra.ml / extra.crypto / extra.redis (never fail)
+- CLI (`src/containment/cli.py`): `containment doctor [--install-only] [--policy] [--secrets-dir | --secrets-env-prefix] [--capability-secret] [--intent-secret] [--isolation-declared] [--egress-proxy | --egress-pinned] [--audit-ship] [--json]`; exit 0 ready / 1 not ready / 2 usage (argparse mutually exclusive groups)
+- `tests/test_doctor.py`: **15 passed** (literal statuses/details/exit codes; secret values absent from text+JSON; compose side-effect-free; env defaults; CLI JSON + exit 0/1/2)
+- Live: unconfigured → `NOT READY — 2/8`, exit 1; fully declared → `OK — 8/8`, exit 0; `--install-only` from a **clean-venv wheel** outside the checkout → `OK — 2/2` (policy from `containment/_data/`)
+- `docs/ARCHITECTURE.md`: modules `doctor`, `resources`; new "Release path" section
+- `release_gate.sh` exit 0: **336 passed, 2 skipped**; ASR 0.0000; scan clean
+- Principles: model-the-domain, boundary-discipline (no parallel checklist), test-behavior-not-implementation, prove-it-works
+
+### Verdict: VERIFIED
+
+## Release + Playbook — Step 7 Local swarm integrity (N=4) — 2026-10-11 JST
+
+### Scope
+Law step 7. Slices A (release flow), B (playbook + skills), C (doctor), D (claim scrub), run locally by the executor (box only). Fix evidenced ISSUES only.
+
+### Evidence
+- Reports: `swarm-reports/release-playbook/slice-A-release.md`, `slice-B-playbook.md`, `slice-C-doctor.md`, `slice-D-claims.md`, `SWARM_AGGREGATE.md`
+- **D-1 HIGH** (cleared): bare `pip install "containment[x]"` hints resolved from PyPI, where `containment` is unclaimed and not this project (name-squat path). All install hints now name `git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git` (doctor pins `@v<version>` via `extra_install_hint`; docs pin `@v1.7.0`)
+- **A-1 MEDIUM** (cleared): release-time `gh attestation verify` bound to `--source-ref refs/tags/vX.Y.Z` + `--signer-workflow .../publish.yml`; consumer docs + box skill show `--source-ref`
+- **C-1 LOW** (cleared): doctor JSON no longer lists host residuals for `scope=install` (matches human output)
+- Residuals: A-R1 major-tag action pins (accepted); A-R2 attest permission set proven on GitHub at step 8 (dispatch run before tag)
+- shellcheck clean; ruff clean; `release_gate.sh` exit 0: **337 passed, 2 skipped**; ASR 0.0000; scan clean
+- Principles: laziness-protocol (3 surgical fixes), boundary-discipline (supply-chain honesty), encode-lessons-in-structure (hint helper + tests)
+
+### Verdict: VERIFIED
+
+## Release + Playbook — Step 8 Final prove-it (pre-push) — 2026-10-11 JST
+
+### Scope
+Law step 8. Bump **1.7.0**; CHANGELOG released section; gate + card; commit + push; then tag + GitHub Release via `cut_release.sh --execute`.
+
+### Evidence
+- Version: pyproject + `__version__` = **1.7.0**; `containment --version` → `containment 1.7.0`
+- `CHANGELOG.md`: `## [1.7.0] - 2026-10-11` (Added / Fixed / Changed), empty `[Unreleased]`, compare link
+- `release_gate.sh` exit **0**: **337 passed, 2 skipped**; ASR **0.0000**, FPR 0.0278, utility 0.9722, blocked 53/53; scan clean
+- `containment-eval-card`: gate=PASS, ON 0.0000, OFF 1.0000, version=1.7.0
+- Gate G0 (PyPI Trusted Publisher) **not** satisfied: publish job gated off; no PyPI claim
+- Principles: prove-it-works, sequence-verifiable-units
+
+### Verdict: VERIFIED (pre-push; push, CI, dispatch build, tag + release next)

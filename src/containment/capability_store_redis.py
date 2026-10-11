@@ -51,7 +51,8 @@ class RedisConsumeStore:
         except ImportError as exc:
             raise CapabilityStoreError(
                 "RedisConsumeStore requires the redis package; "
-                'install with: pip install "containment[redis]"'
+                'install with: pip install "containment[redis] @ '
+                'git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git"'
             ) from exc
         try:
             return redis.Redis.from_url(url, decode_responses=True)

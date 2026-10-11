@@ -1,0 +1,73 @@
+# Build + attest release distributions on version tags; optional PyPI upload via
+# Trusted Publishing (OIDC, no stored tokens). Runbook: docs/RELEASE.md
+name: publish
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Tag matches package version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          pkg="$(sed -n 's/^version = "\(.*\)"$/\1/p' pyproject.toml | head -n1)"
+          init="$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' src/containment/__init__.py | head -n1)"
+          tag="${GITHUB_REF_NAME#v}"
+          echo "tag=$tag pyproject=$pkg __version__=$init"
+          test "$tag" = "$pkg" && test "$tag" = "$init"
+
+      - name: Build sdist + wheel (once)
+        run: |
+          python -m pip install -U pip "build>=1.2" "twine>=6"
+          python -m build
+          python -m twine check --strict dist/*
+          ls -l dist
+
+      - name: Attest build provenance
+        uses: actions/attest@v4
+        with:
+          subject-path: "dist/*"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    # PyPI is opt-in: needs repo variable PYPI_PUBLISH=true plus a registered
+    # Trusted Publisher (docs/RELEASE.md, Gate G0). Otherwise this job is skipped.
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v') && vars.PYPI_PUBLISH == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/containment/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI (Trusted Publishing + PEP 740 attestations)
+        uses: pypa/gh-action-pypi-publish@release/v1

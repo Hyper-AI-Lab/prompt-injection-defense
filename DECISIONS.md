@@ -354,3 +354,46 @@ claims.
 - ARCHITECTURE Modules + README layout name `eval_card` (X1/X2).
 - Residuals unchanged: card stays out of `release_gate`; artifacts gitignored.
 
+
+---
+
+## 2026-10-11 — Release ritual Bar F + bot playbook Bar G (→ 1.7.0)
+
+### Release ritual (F) — **ADOPT**
+- `CHANGELOG.md` (Keep a Changelog 1.1.0), backfilled 1.0.0–1.6.1 from release commits;
+  annotated tags `v1.0.0`…`v1.6.1` backfilled on the unambiguous `Release containment X.Y.Z`
+  commits (no GitHub Release objects for them).
+- `scripts/cut_release.sh`: dry run by default; fail-closed on non-semver, version drift
+  (`pyproject` / `__version__`), missing CHANGELOG section, existing tag, dirty tree,
+  HEAD ≠ origin/main, gate fail, eval-card fail, build fail. `--execute` tags, waits for the
+  publish run, verifies attested dists with `gh attestation verify`, then creates the GitHub
+  Release with CHANGELOG notes + wheel + sdist + eval card.
+- `.github/workflows/publish.yml`: build once on tags, `twine check --strict`,
+  `actions/attest@v4` build provenance, artifact hand-off; PyPI job via
+  `pypa/gh-action-pypi-publish@release/v1` (Trusted Publishing, PEP 740) gated on
+  `vars.PYPI_PUBLISH == 'true'` + environment `pypi`. No stored tokens.
+- Channel: **GitHub Releases only** (K, 2026-10-11). PyPI Gate G0 pending; nothing claims
+  PyPI presence.
+- Wheel fix found while building: duplicate `force-include` broke `python -m build`;
+  wheels could not find `policies/` / `fixtures/`. Now shipped as `containment/_data/` and
+  resolved by `containment.resources`; CI gains a wheel smoke step.
+
+### Bot playbook (G) — **ADOPT**
+- `docs/BOT_PLAYBOOK.md`: install (attested wheel or pinned tag) → policy → ingest → plan →
+  enterprise broker + `BrokeredRegistry` + signed intent → reference host → doctor → host
+  residuals → eval card → upgrade. Its wiring example is locked by a test.
+- `containment doctor`: offline report built on `HostChecklist` + `build_enterprise_host`
+  (no parallel checklist); `--json`; exit 0/1/2; `--install-only` for package checks.
+- Repo `SKILL.md` and shared box skill `containment-untrusted-content` pin `@v1.7.0` and
+  point at broker, adapters, reference host, eval card, doctor.
+
+### Accepted residuals
+- Workflow actions pinned by major tag (Dependabot refresh), not commit SHA.
+- Doctor reads declarations; it cannot prove OS isolation, egress enforcement or WORM
+  retention.
+- PyPI publishing stays off until the owner registers the Trusted Publisher and sets
+  `PYPI_PUBLISH=true` (docs/RELEASE.md).
+
+### Explicit non-goals
+Expanding fixtures; AgentDojo live; hosted shields; auto-wiring Claude.app; SOTA claims;
+long-lived PyPI tokens.

@@ -186,7 +186,8 @@ class Ed25519IntentSigner:
     """Signs and verifies intents with Ed25519 (optional ``cryptography`` extra).
 
     Prefer public-only construction on the broker verify path. Signing requires
-    a private key. Install with ``pip install containment[crypto]``.
+    a private key. Install with
+    ``pip install "containment[crypto] @ git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git"``.
     """
 
     ALG = "ed25519"
@@ -206,7 +207,8 @@ class Ed25519IntentSigner:
         except ImportError as exc:
             raise IntentError(
                 "Ed25519IntentSigner requires the cryptography package; "
-                'install with pip install "containment[crypto]"'
+                'install with pip install "containment[crypto] @ '
+                'git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git"'
             ) from exc
 
         self.key_id = key_id
@@ -262,7 +264,8 @@ class Ed25519IntentSigner:
         except ImportError as exc:
             raise IntentError(
                 "Ed25519IntentSigner requires the cryptography package; "
-                'install with pip install "containment[crypto]"'
+                'install with pip install "containment[crypto] @ '
+                'git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git"'
             ) from exc
         return cls(Ed25519PrivateKey.generate(), key_id=key_id)
 

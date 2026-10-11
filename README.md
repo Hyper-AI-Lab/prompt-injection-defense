@@ -48,11 +48,16 @@ containment-reference-host --scenario all
 
 ## Install
 
-Python 3.12+ recommended. PyPI package name is `containment`.
+Python 3.12+. Distribution name `containment`; releases are published on
+[GitHub Releases](https://github.com/Hyper-AI-Lab/prompt-injection-defense/releases)
+(wheel + sdist with artifact attestations). It is **not** on PyPI.
 
 ```bash
-pip install "git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git"
+pip install "git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.7.0"
+containment doctor --install-only
 ```
+
+Attestation-verified wheel install: [docs/BOT_PLAYBOOK.md](docs/BOT_PLAYBOOK.md) §1.
 
 From a clone:
 
@@ -170,20 +175,31 @@ the card CLI is the separate prove-it smoke.
 
 ## Package layout
 
-- `src/containment/` — labels, policy, broker, ingest, detectors, quarantine, moltbook, adapters (Bar C), reference_host (Bar D), eval_card (Bar E), CLI
-- `policies/default_deny.yaml` — default-deny tool policy
-- `fixtures/attacks` / `fixtures/benign` — offline eval corpus
-- `docs/` — threat model, architecture, agent install, host hardening, eval card
+- `src/containment/` — labels, policy, broker, ingest, detectors, quarantine, moltbook, adapters (Bar C), reference_host (Bar D), eval_card (Bar E), doctor + resources (Bar G), CLI
+- `policies/default_deny.yaml` — default-deny tool policy (also shipped inside the wheel)
+- `fixtures/attacks` / `fixtures/benign` — offline eval corpus (also shipped inside the wheel)
+- `docs/` — threat model, architecture, bot playbook, agent install, host hardening, eval card, release runbook
+- `scripts/` — `release_gate.sh`, `cut_release.sh`, `microbench_host.py`
 - `SKILL.md` — procedure for Grok bots / agents
+- `CHANGELOG.md` — release history
 
 ## Agent install
 
-See [docs/AGENT_INSTALL.md](docs/AGENT_INSTALL.md),
-[docs/HOST_HARDENING.md](docs/HOST_HARDENING.md), and [SKILL.md](SKILL.md).
+Start with [docs/BOT_PLAYBOOK.md](docs/BOT_PLAYBOOK.md) (install → policy → ingest →
+broker → adapters → reference host → `containment doctor` → eval card → host residuals).
+Reference: [docs/AGENT_INSTALL.md](docs/AGENT_INSTALL.md),
+[docs/HOST_HARDENING.md](docs/HOST_HARDENING.md), [SKILL.md](SKILL.md).
+
+## Releases
+
+[CHANGELOG.md](CHANGELOG.md) and [docs/RELEASE.md](docs/RELEASE.md). Releases are cut with
+`scripts/cut_release.sh` (fail-closed: clean tree, gate, eval card, version sync) and built
+and attested by `.github/workflows/publish.yml`. PyPI upload is wired through Trusted
+Publishing but disabled until the project owner enables it.
 
 ## CI / SBOM (local)
 
-GitHub Actions: `.github/workflows/ci.yml` (ruff, pytest, `scripts/release_gate.sh`, `pip-audit`, CycloneDX).
+GitHub Actions: `.github/workflows/ci.yml` (ruff, pytest, `scripts/release_gate.sh`, wheel smoke, `pip-audit`, CycloneDX).
 Dependabot: `.github/dependabot.yml`.
 
 ```bash

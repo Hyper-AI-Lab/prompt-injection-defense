@@ -12,6 +12,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from containment import resources
 from containment.actions import ProposedAction
 from containment.audit import AuditLog
 from containment.broker import SecurityViolation, ToolBroker
@@ -257,10 +258,9 @@ def main(argv: list[str] | None = None) -> int:
     policy_env = os.environ.get("CONTAINMENT_POLICY")
     policy_arg = args.policy or policy_env
     if not policy_arg:
-        # Package-relative default_deny.
-        policy_path = Path(__file__).resolve().parents[3] / "policies" / "default_deny.yaml"
+        # Shipped default_deny (wheel data or repo checkout).
+        policy_path = resources.default_policy_path()
         if not policy_path.is_file():
-            # Installed wheel may lack policies/; require explicit path.
             payload = _deny("missing policy: set CONTAINMENT_POLICY or --policy")
             print(json.dumps(payload, separators=(",", ":")))
             return 0

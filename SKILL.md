@@ -18,6 +18,16 @@ become authority.
 
 ## Install (once per environment)
 
+Pin a release tag (GitHub Releases; not on PyPI). Full procedure with attestation
+verify: `docs/BOT_PLAYBOOK.md` §1.
+
+```bash
+pip install "git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.7.0"
+containment doctor --install-only        # exit 0 = package data + policy OK
+```
+
+From a clone (development):
+
 ```bash
 cd prompt-injection-defense
 python3 -m venv .venv && source .venv/bin/activate
@@ -77,6 +87,14 @@ Prefer `BrokeredRegistry` / `brokered_tool` so every tool invoke hits `secure_ex
 
 Before inventing a custom host, run `containment-reference-host --scenario all` (see `docs/REFERENCE_HOST.md`). It is the wiring recipe: enterprise compose + signed intents + BrokeredRegistry + ingest. Attack must deny; benign fetch allow; email.send must require human approval.
 
+## Host check
+
+Run `containment doctor` with the host's real settings (`--secrets-dir`,
+`--isolation-declared`, `--egress-pinned` or `--egress-proxy URL`, `--audit-ship PATH`).
+Exit 0 = every required host control is declared and `build_enterprise_host` composes;
+exit 1 = something required is missing (listed). `--json` for machines. Doctor sees
+declarations only; real isolation, WORM audit and secret rotation stay host-owned.
+
 ## Eval honesty
 
 ```bash
@@ -91,6 +109,9 @@ and OFF ASR strictly worse (both after 4-decimal rounding). See `docs/EVAL_CARD.
 
 ## References
 
+- `docs/BOT_PLAYBOOK.md` (end-to-end, start here)
+- `docs/RELEASE.md`
+- `CHANGELOG.md`
 - `docs/THREAT_MODEL.md`
 - `docs/ARCHITECTURE.md`
 - `docs/AGENT_INSTALL.md`

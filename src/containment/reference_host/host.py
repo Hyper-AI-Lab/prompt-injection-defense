@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from containment import resources
 from containment.adapters import BrokeredRegistry
 from containment.broker import ApprovalHook, ApprovalOutcome
 from containment.enterprise import EnterpriseHost, build_enterprise_host
@@ -15,8 +16,6 @@ from containment.labels import SecurityLabel
 from containment.plan import IntentEnvelope, Plan, PlanStep
 
 _PKG_ROOT = Path(__file__).resolve().parent
-_REPO_ROOT = _PKG_ROOT.parents[2]
-_DEFAULT_POLICY = _REPO_ROOT / "policies" / "default_deny.yaml"
 _FIXTURES = _PKG_ROOT / "fixtures"
 
 TASK_ID = "ref-host-demo"
@@ -43,11 +42,12 @@ def load_fixture(name: str) -> str:
 
 
 def default_policy_path() -> Path:
-    """Path to ``policies/default_deny.yaml`` in the repo checkout."""
-    if _DEFAULT_POLICY.is_file():
-        return _DEFAULT_POLICY
+    """Path to ``policies/default_deny.yaml`` (packaged wheel data or repo checkout)."""
+    path = resources.default_policy_path()
+    if path.is_file():
+        return path
     raise FileNotFoundError(
-        f"default policy not found at {_DEFAULT_POLICY}; "
+        f"default policy not found at {path}; "
         "pass policy_path= to build_reference_host"
     )
 

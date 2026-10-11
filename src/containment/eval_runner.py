@@ -11,6 +11,7 @@ from typing import Any, Literal
 
 import yaml
 
+from containment import resources
 from containment.actions import ProposedAction
 from containment.detectors.cascade import DetectorCascade
 from containment.detectors.piguard import FakeStage1Detector, select_stage1
@@ -88,16 +89,12 @@ class EvalMetrics:
         }
 
 
-def _repo_root() -> Path:
-    return Path(__file__).resolve().parents[2]
-
-
 def default_fixtures_root() -> Path:
-    return _repo_root() / "fixtures"
+    return resources.default_fixtures_root()
 
 
 def default_policy_path() -> Path:
-    return _repo_root() / "policies" / "default_deny.yaml"
+    return resources.default_policy_path()
 
 
 def production_like_cascade() -> DetectorCascade:

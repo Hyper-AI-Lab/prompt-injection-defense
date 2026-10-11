@@ -1,9 +1,19 @@
 # Agent install guide
 
 For Grok bots and other Python agents that must read untrusted content
-(including Moltbook) without granting it authority.
+(including Moltbook) without granting it authority. The step-by-step operator path is
+[BOT_PLAYBOOK.md](BOT_PLAYBOOK.md); this guide is the per-topic reference.
 
 ## 1. Install the package
+
+Pinned release (GitHub Releases; not on PyPI):
+
+```bash
+pip install "git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.7.0"
+containment doctor --install-only
+```
+
+Attestation-verified wheel: [BOT_PLAYBOOK.md](BOT_PLAYBOOK.md) §1. From a clone:
 
 ```bash
 cd /path/to/prompt-injection-defense
@@ -109,7 +119,7 @@ Default `ingest()` uses **RulesOnly** (offline, fail-closed metadata). To enable
 optional PIGuard:
 
 ```bash
-pip install -e ".[dev,ml]"   # or: pip install 'containment[ml]'
+pip install -e ".[dev,ml]"   # or: pip install "containment[ml] @ git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.7.0"
 # First enable needs network *or* a pre-seeded Hugging Face cache.
 export CONTAINMENT_STAGE1=piguard
 export CONTAINMENT_PIGUARD_ALLOW_DOWNLOAD=1   # required to call try_load
@@ -208,3 +218,19 @@ Artifacts land under `artifacts/eval-card/` (gitignored). Details:
 public leaderboard. `release_gate.sh` still runs a single policy-ON eval; the
 card CLI is the prove-it smoke for citation.
 
+
+## 12. Host doctor
+
+Check the host wiring offline with the same settings passed to `build_enterprise_host`:
+
+```bash
+containment doctor --secrets-dir /srv/agent/secrets --isolation-declared \
+  --egress-pinned --audit-ship /srv/agent/audit-shipped.jsonl
+containment doctor --json ...   # machine-readable report
+```
+
+Exit `0`: package data, policy, every `HostChecklist` item, both secrets and the enterprise
+compose pass. Exit `1`: a required check failed (each failure is listed with a fix hint).
+Exit `2`: usage error. Optional extras (`ml`, `crypto`, `redis`) are informational.
+`containment doctor --install-only` checks only the package and default policy.
+Doctor reads declarations; it cannot prove OS isolation or WORM retention (§8).

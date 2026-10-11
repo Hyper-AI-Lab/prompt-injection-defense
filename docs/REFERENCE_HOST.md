@@ -79,9 +79,10 @@ Enterprise compose requires:
 
 ## Policy packaging (residual)
 
-The reference-host CLI embeds scenario policy in code/fixtures and does **not** expose
-`--policy` / `CONTAINMENT_POLICY` the way `containment-claude-hook` does. Wheel installs
-ship the hermetic fixtures used by offline scenarios. Hosts that need a custom YAML
+The reference-host CLI uses the shipped `policies/default_deny.yaml`
+(`containment.resources.default_policy_path()`, packaged in the wheel) and does **not**
+expose `--policy` / `CONTAINMENT_POLICY` the way `containment-claude-hook` does. Wheel
+installs also ship the hermetic fixtures used by offline scenarios. Hosts that need a custom YAML
 policy should compose `build_reference_host` / `build_enterprise_host` in-process and
 pass their own `PolicyEngine`, or use the Claude hook CLI which does accept a policy path.
 
