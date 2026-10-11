@@ -2559,3 +2559,30 @@ Law step 8. Bump **1.7.0**; CHANGELOG released section; gate + card; commit + pu
 - Principles: prove-it-works, sequence-verifiable-units
 
 ### Verdict: VERIFIED (pre-push; push, CI, dispatch build, tag + release next)
+
+## Release + Playbook — Step 8 Final prove-it (post-push) — 2026-10-11 JST
+
+### Scope
+Confirm `origin/main`, tag `v1.7.0`, GitHub Release, CI and publish runs.
+
+### Evidence
+- Release commit `8d18e31` — *Release containment 1.7.0 — release ritual + bot playbook*; push `aa788ca..8d18e31 main -> main`
+- CI on main (run 38127144616): **success** incl. new "Wheel smoke" step
+- Pre-tag proof (A-R2): `publish` via `workflow_dispatch` on main (run 38127164322): build **success**, publish **skipped**; `gh attestation verify --source-ref refs/heads/main --signer-workflow .../publish.yml` exit 0; same with `--source-ref refs/tags/v1.7.0` exit 1 ("expected SourceRepositoryRef to be refs/tags/v1.7.0, got refs/heads/main") — binding works
+- Backfilled annotated tags `v1.0.0`…`v1.6.1` pushed; no workflow runs triggered (no publish.yml at those commits)
+- `cut_release.sh 1.7.0` dry run exit 0 (all 9 checks; gate 337 passed; card PASS sha 8d18e31f0362; local build OK)
+- `cut_release.sh 1.7.0 --execute` exit 0: annotated tag `v1.7.0` → `8d18e31`; publish run 38127364508 (push, v1.7.0) **success**: build success, publish **skipped**; both dists attestation-verified (tag + workflow bound); release created
+- `gh release view v1.7.0`: https://github.com/Hyper-AI-Lab/prompt-injection-defense/releases/tag/v1.7.0 — not draft; assets `containment-1.7.0-py3-none-any.whl`, `containment-1.7.0.tar.gz`, `eval-card.json`, `eval-card.md`; body = CHANGELOG [1.7.0]
+- Consumer path (fresh dir/venv): `gh release download` → `gh attestation verify --source-ref refs/tags/v1.7.0` wheel 0 / sdist 0 → `pip install` wheel → `containment 1.7.0`; `doctor --install-only` OK 2/2; `containment-reference-host --scenario all` OK 3/3; full host doctor `--json` ok=true 8/8
+- PyPI: **not published**; Gate G0 pending (Trusted Publisher + `PYPI_PUBLISH=true`, docs/RELEASE.md)
+
+### Done predicate (law)
+1 every step VERIFIED ✔ · 2 release ritual ✔ (CHANGELOG, RELEASE.md, tag, GitHub Release, publish.yml, cut_release.sh) · 3 bot playbook ✔ (playbook, both skills, doctor, docs, tests) · 4 no unfinished markers, gate 0, ASR 0.0000, pytest green, card PASS ✔ · 5 push main + tag + GitHub Release ✔; PyPI pending G0 documented, no claim ✔
+
+### Residuals
+- PyPI G0 pending (owner action)
+- Actions pinned by major tag (Dependabot), not SHA
+- Doctor reads declarations; isolation / egress enforcement / WORM / secret rotation stay host-owned
+- Prior Bar C–E residuals unchanged
+
+### Verdict: VERIFIED
