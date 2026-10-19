@@ -34,3 +34,12 @@ def test_wheel_config_ships_policies_and_fixtures() -> None:
     text = (REPO / "pyproject.toml").read_text(encoding="utf-8")
     assert '"policies" = "containment/_data/policies"' in text
     assert '"fixtures" = "containment/_data/fixtures"' in text
+
+
+def test_sdist_ships_what_the_shipped_tests_read() -> None:
+    import tomllib
+
+    data = tomllib.loads((REPO / "pyproject.toml").read_text(encoding="utf-8"))
+    include = data["tool"]["hatch"]["build"]["targets"]["sdist"]["include"]
+    for path in ("/tests", "/scripts", "/src", "/policies", "/fixtures", "/docs"):
+        assert path in include, path

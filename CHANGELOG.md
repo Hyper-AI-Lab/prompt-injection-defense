@@ -9,6 +9,22 @@ They are not a benchmark claim; see `docs/EVAL_CARD.md` for scope.
 
 ## [Unreleased]
 
+## [1.7.1] - 2026-10-19
+
+### Fixed
+- `containment doctor` no longer crashes on an unreadable secret file or a malformed
+  proxy URL (`http://[::1`, blank); both now report a failed check, including with `--json`.
+  A proxy URL with an out-of-range or non-numeric port now fails instead of passing.
+- `containment doctor` hides `user:password@` in proxy URLs (human and JSON output).
+- Missing-extra errors from `Ed25519IntentSigner` and `RedisConsumeStore` pin the install
+  hint to the running version's tag instead of the repository's `main` branch.
+- The sdist now includes `scripts/`, so its shipped test suite runs (10 tests errored).
+
+### Changed
+- `docs/BOT_PLAYBOOK.md`: "Plan before reading" is now step 3 and "Ingest" step 4, matching
+  the rule that the plan is declared before untrusted text is read. Install pins move to
+  `v1.7.1`.
+
 ## [1.7.0] - 2026-10-11
 
 ### Added
@@ -121,7 +137,8 @@ They are not a benchmark claim; see `docs/EVAL_CARD.md` for scope.
 - First release: trust labels, default-deny policy broker, ingest/quarantine,
   detector cascade, Moltbook read-only helper, offline eval CLI, agent install skill.
 
-[Unreleased]: https://github.com/Hyper-AI-Lab/prompt-injection-defense/compare/v1.7.0...HEAD
+[Unreleased]: https://github.com/Hyper-AI-Lab/prompt-injection-defense/compare/v1.7.1...HEAD
+[1.7.1]: https://github.com/Hyper-AI-Lab/prompt-injection-defense/compare/v1.7.0...v1.7.1
 [1.7.0]: https://github.com/Hyper-AI-Lab/prompt-injection-defense/compare/v1.6.1...v1.7.0
 [1.6.1]: https://github.com/Hyper-AI-Lab/prompt-injection-defense/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/Hyper-AI-Lab/prompt-injection-defense/compare/v1.5.1...v1.6.0

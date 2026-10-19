@@ -10,7 +10,7 @@ secrets storage and audit retention (step 8).
 
 ## 0. Pick the version
 
-Use a tagged release. Current: `v1.7.0` (see `CHANGELOG.md`). Releases are on GitHub;
+Use a tagged release. Current: `v1.7.1` (see `CHANGELOG.md`). Releases are on GitHub;
 the package is not on PyPI.
 
 ## 1. Install
@@ -18,30 +18,30 @@ the package is not on PyPI.
 Verified wheel (recommended for production hosts):
 
 ```bash
-gh release download v1.7.0 -R Hyper-AI-Lab/prompt-injection-defense -p 'containment-*'
-gh attestation verify containment-1.7.0-py3-none-any.whl -R Hyper-AI-Lab/prompt-injection-defense \
-  --source-ref refs/tags/v1.7.0
+gh release download v1.7.1 -R Hyper-AI-Lab/prompt-injection-defense -p 'containment-*'
+gh attestation verify containment-1.7.1-py3-none-any.whl -R Hyper-AI-Lab/prompt-injection-defense \
+  --source-ref refs/tags/v1.7.1
 python3 -m venv .venv && . .venv/bin/activate
-pip install ./containment-1.7.0-py3-none-any.whl
+pip install ./containment-1.7.1-py3-none-any.whl
 ```
 
 `gh attestation verify` proves the wheel was built by this repo's `publish` workflow on
 the tag (needs gh 2.49 or newer). Pinned install straight from git (no attestation):
 
 ```bash
-pip install "git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.7.0"
+pip install "git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.7.1"
 ```
 
 Optional extras: `[crypto]` (Ed25519 intents), `[redis]` (shared consume store),
-`[ml]` (PIGuard Stage-1, see step 3). Install extras from the wheel
-(`pip install './containment-1.7.0-py3-none-any.whl[crypto]'`) or the tag
-(`pip install "containment[crypto] @ git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.7.0"`). Never `pip install containment` from
+`[ml]` (PIGuard Stage-1, see step 4). Install extras from the wheel
+(`pip install './containment-1.7.1-py3-none-any.whl[crypto]'`) or the tag
+(`pip install "containment[crypto] @ git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.7.1"`). Never `pip install containment` from
 PyPI: that name is not this project.
 
 Done when:
 
 ```bash
-containment --version          # containment 1.7.0
+containment --version          # containment 1.7.1
 containment doctor --install-only
 ```
 
@@ -64,7 +64,25 @@ means deny. Its rules:
 Copy it and edit for your tools; keep `default: deny`. Pass your file as `policy_path=`
 (step 5) and `containment doctor --policy PATH`.
 
-## 3. Ingest every external text
+## 3. Plan before reading
+
+Declare the task's tools, recipients and hosts in a `Plan` **before** untrusted content
+is read, so injected text cannot widen it.
+
+```python
+from containment import Plan, PlanStep
+
+plan = Plan(
+    task_id=task_id,
+    steps=(PlanStep(step_id="fetch", tool="web.fetch"),
+           PlanStep(step_id="notify", tool="email.send")),
+    capabilities=frozenset({"web.fetch", "email.send"}),
+    approved_public_hosts=frozenset({"example.com"}),
+    approved_recipients=frozenset({"owner@example.com"}),
+)
+```
+
+## 4. Ingest every external text
 
 Web pages, email, documents, tool output and social posts go through `ingest` before
 the model reasons over them. Keep the returned label on everything derived from it.
@@ -82,27 +100,9 @@ labels = (result.label,)                # integrity="untrusted" for external tex
 Moltbook (public, read-only, no account): `containment.moltbook.read_posts(sort="hot",
 limit=8)`; reason over `title` / `topic` / `summary` only, never call tools from post
 text. Stage-1 detection defaults to RulesOnly; PIGuard is opt-in
-(`pip install "containment[ml] @ git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.7.0"`, `CONTAINMENT_STAGE1=piguard`,
+(`pip install "containment[ml] @ git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.7.1"`, `CONTAINMENT_STAGE1=piguard`,
 `CONTAINMENT_PIGUARD_ALLOW_DOWNLOAD=1`; review `trust_remote_code` first). Detectors
 advise, they never authorize. Details: [AGENT_INSTALL.md](AGENT_INSTALL.md) §3–§4, §7.
-
-## 4. Plan before reading
-
-Declare the task's tools, recipients and hosts in a `Plan` **before** untrusted content
-is read, so injected text cannot widen it.
-
-```python
-from containment import Plan, PlanStep
-
-plan = Plan(
-    task_id=task_id,
-    steps=(PlanStep(step_id="fetch", tool="web.fetch"),
-           PlanStep(step_id="notify", tool="email.send")),
-    capabilities=frozenset({"web.fetch", "email.send"}),
-    approved_public_hosts=frozenset({"example.com"}),
-    approved_recipients=frozenset({"owner@example.com"}),
-)
-```
 
 ## 5. Broker every tool call (enterprise host)
 
@@ -144,7 +144,7 @@ intent = host.intent_signer.sign(
     plan=plan,
 )
 try:
-    # labels from step 3 are untrusted here, so this raises (deny, no-tainted-egress)
+    # labels from step 4 are untrusted here, so this raises (deny, no-tainted-egress)
     registry.call("email.send",
                   {"recipient": "owner@example.com", "subject": s, "body": b},
                   input_labels=labels, plan_step="notify", intent=intent)

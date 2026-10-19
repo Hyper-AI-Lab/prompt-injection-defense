@@ -1,0 +1,9 @@
+ts	phase	decision	why	evidence	result
+2026-10-19T09:39:46+09:00	frame	locked RELEASE_1_7_0_AUDIT_PLAN.md as law	K asked separate 1.7.0 audit; mirror Bar E audit method	RELEASE_1_7_0_AUDIT_PLAN.md	plan written
+2026-10-19T09:39:46+09:00	frame	local slices not cloud swarm	standing box-only rule	plan non-goals	local swarm
+2026-10-19T09:47:52+09:00	plan-match	wrote AUDIT_PLAN_VS_1_7_0.md	law step 1	AUDIT_PLAN_VS_1_7_0.md G1-G6	GAPS listed
+2026-10-19T09:47:52+09:00	baseline	fresh gate+build+wheel venv	law step 2	337 passed 2 skipped; ASR 0.0000; build bit-identical to release	VERIFIED
+2026-10-19T09:47:52+09:00	swarm	7 local slices A-G	law step 3; box-only	SWARM_AGGREGATE G1-G6	ISSUES
+2026-10-19T09:47:52+09:00	swarm	keep attestation main-ref match as note	reproducible build; tag-bound verify holds	slice-G	accepted
+2026-10-19T09:51:35+09:00	fix	G1-G6 surgical fixes with tests	evidenced ISSUES only	doctor.py intent.py capability_store_redis.py pyproject sdist BOT_PLAYBOOK + 10 tests	VERIFIED
+2026-10-19T09:51:35+09:00	version	bump 1.7.1	doctor behaviour + error hints changed	gate 347 passed ASR 0.0000	decided

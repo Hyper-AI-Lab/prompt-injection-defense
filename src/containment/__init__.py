@@ -96,7 +96,7 @@ from containment.url_guard import (
     parse_egress_url,
 )
 
-__version__ = "1.7.0"
+__version__ = "1.7.1"
 
 __all__ = [
     "ALLOWLIST_SUMMARY_SCHEMA",

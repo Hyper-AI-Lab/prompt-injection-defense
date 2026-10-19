@@ -22,7 +22,7 @@ Pin a release tag (GitHub Releases; not on PyPI). Full procedure with attestatio
 verify: `docs/BOT_PLAYBOOK.md` §1.
 
 ```bash
-pip install "git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.7.0"
+pip install "git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.7.1"
 containment doctor --install-only        # exit 0 = package data + policy OK
 ```
 

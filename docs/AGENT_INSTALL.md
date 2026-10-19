@@ -9,7 +9,7 @@ For Grok bots and other Python agents that must read untrusted content
 Pinned release (GitHub Releases; not on PyPI):
 
 ```bash
-pip install "git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.7.0"
+pip install "git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.7.1"
 containment doctor --install-only
 ```
 
@@ -119,7 +119,7 @@ Default `ingest()` uses **RulesOnly** (offline, fail-closed metadata). To enable
 optional PIGuard:
 
 ```bash
-pip install -e ".[dev,ml]"   # or: pip install "containment[ml] @ git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.7.0"
+pip install -e ".[dev,ml]"   # or: pip install "containment[ml] @ git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.7.1"
 # First enable needs network *or* a pre-seeded Hugging Face cache.
 export CONTAINMENT_STAGE1=piguard
 export CONTAINMENT_PIGUARD_ALLOW_DOWNLOAD=1   # required to call try_load

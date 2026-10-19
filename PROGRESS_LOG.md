@@ -2586,3 +2586,35 @@ Confirm `origin/main`, tag `v1.7.0`, GitHub Release, CI and publish runs.
 - Prior Bar C–E residuals unchanged
 
 ### Verdict: VERIFIED
+
+## Release 1.7.0 Audit — Steps 1–3 (plan-match, fresh baseline, slices) — 2026-10-19 JST
+
+### Scope
+Law `RELEASE_1_7_0_AUDIT_PLAN.md` steps 1–3. K asked for a separate audit of 1.7.0. Box only.
+
+### Evidence
+- Step 1: `AUDIT_PLAN_VS_1_7_0.md` — law steps 1–4, 7, 8 PASS; step 5 GAP (G6), step 6 GAP (G1–G3); predicate 2 note G5; D-1 leftover G4
+- Step 2 (fresh, HEAD `6155a1f`): `release_gate.sh` exit 0 — ruff clean, **337 passed, 2 skipped**, ASR **0.0000**, FPR 0.0278, utility 0.9722, blocked 53/53, scan clean. `python -m build` + `twine check --strict` PASSED; wheel/sdist sha256 identical to the v1.7.0 release assets. Throwaway wheel venv: `doctor --install-only` 2/2 exit 0, bare `doctor` 2/8 exit 1, full host 8/8 exit 0, `containment-eval-card` gate=PASS (ON 0.0000 / OFF 1.0000), reference host 3/3
+- Step 3: `swarm-reports/release-1-7-0-audit/` slices A–G + aggregate + DECISION_LOG. A, B, F, G PASS; C (G1 MED unreadable secret → traceback, G2 MED proxy credentials printed, G3 LOW malformed proxy URL → traceback / bad port PASS), D (G5 LOW sdist lacks scripts/ → 10 test errors), E (G6 LOW playbook plan/ingest order, G4 LOW unpinned runtime extra hints)
+- Release assets: v1.7.0 wheel + sdist attestation verify exit 0 with `--source-ref refs/tags/v1.7.0 --signer-workflow …/publish.yml`
+
+### Verdict: VERIFIED (GAPs G1–G6 → step 4)
+
+## Release 1.7.0 Audit — Step 4 Fix (G1–G6) — 2026-10-19 JST
+
+### Scope
+Law step 4. Surgical fixes for evidenced GAPs only, each locked by a test.
+
+### Evidence
+- G1 `doctor.py`: secret load catches `(SecretError, OSError)` → `host.secrets` FAIL with report
+- G2 `doctor.py`: `_redact_url` → `proxy http://***@host:port` in human + JSON
+- G3 `doctor.py`: `_proxy_url_ok` (http/https, host, valid port) checked before `ProxyEgressProvider`; `http://[::1`, blank, `:99999`, `:x`, `ftp://` → FAIL, compose skipped, exit 1
+- G4 `intent.py` (×2), `capability_store_redis.py`: hints via `doctor.extra_install_hint` (pinned `@vX.Y.Z`)
+- G5 `pyproject.toml`: sdist include `/scripts`
+- G6 `docs/BOT_PLAYBOOK.md`: §3 Plan before reading, §4 Ingest; cross-refs updated
+- Tests: +10 (`test_doctor.py` 5 param + 2 + 1, `test_resources.py` 1, `test_bot_playbook.py` 1); doctor/hint tests fail on 1.7.0 code, pass now
+- Version 1.7.1 (pyproject, `__version__`, CHANGELOG `[1.7.1] - 2026-10-19`, doc pins); DECISIONS entry
+- `release_gate.sh` exit 0: **347 passed, 2 skipped**; ASR **0.0000**, FPR 0.0278, utility 0.9722, blocked 53/53; scan clean
+- Build 1.7.1: `twine check --strict` PASSED; unpacked sdist pytest **347 passed, 2 skipped**; wheel venv doctor 8/8, bad/credential proxy → FAIL / redacted with valid JSON, unreadable secret → FAIL with JSON; eval card gate=PASS; reference host 3/3
+
+### Verdict: VERIFIED

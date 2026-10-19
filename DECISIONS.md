@@ -397,3 +397,23 @@ claims.
 ### Explicit non-goals
 Expanding fixtures; AgentDojo live; hosted shields; auto-wiring Claude.app; SOTA claims;
 long-lived PyPI tokens.
+
+---
+
+## 2026-10-19 — Release 1.7.0 audit harden (→ 1.7.1)
+
+### Doctor robustness + secret hygiene — **ADOPT**
+- Doctor validates a proxy URL (http/https, host, numeric in-range port) before building
+  `ProxyEgressProvider`; malformed URLs fail `host.egress` instead of raising. Unreadable
+  secret files fail `host.secrets` (`OSError` caught with `SecretError`). `--json` always
+  prints a report.
+- Proxy `user:password@` is shown as `***@` in doctor output.
+- Runtime missing-extra errors reuse `doctor.extra_install_hint` (pinned `@vX.Y.Z`).
+- sdist ships `scripts/` so its tests run; playbook declares the plan (step 3) before ingest
+  (step 4).
+
+### Accepted residuals (unchanged)
+Card out of `release_gate`; actions pinned by major tag; host-owned isolation / egress
+enforcement / WORM / secret rotation; PyPI off until G0. Reproducible builds mean a
+pre-tag `workflow_dispatch` attestation on `main` can match release digests; consumers bind
+with `--source-ref refs/tags/vX.Y.Z`.

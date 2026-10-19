@@ -53,7 +53,7 @@ Python 3.12+. Distribution name `containment`; releases are published on
 (wheel + sdist with artifact attestations). It is **not** on PyPI.
 
 ```bash
-pip install "git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.7.0"
+pip install "git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.7.1"
 containment doctor --install-only
 ```
 

@@ -118,7 +118,12 @@ def test_playbook_names_the_code_it_documents() -> None:
         "containment doctor --install-only",
         "containment-reference-host --scenario all",
         "containment-eval-card --suite fixtures",
-        "gh attestation verify containment-1.7.0-py3-none-any.whl",
-        "--source-ref refs/tags/v1.7.0",
+        "gh attestation verify containment-1.7.1-py3-none-any.whl",
+        "--source-ref refs/tags/v1.7.1",
     ):
         assert needle in text, needle
+
+
+def test_playbook_declares_plan_before_ingest() -> None:
+    text = (REPO / "docs" / "BOT_PLAYBOOK.md").read_text(encoding="utf-8")
+    assert text.index("## 3. Plan before reading") < text.index("## 4. Ingest every external text")

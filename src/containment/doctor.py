@@ -188,6 +188,26 @@ def _secret_provider(cfg: DoctorConfig) -> tuple[SecretProvider | None, str]:
     return None, ""
 
 
+def _proxy_url_ok(url: str) -> bool:
+    """True if ``url`` is ``http(s)://HOST[:PORT]`` with a valid port."""
+    try:
+        parts = urlsplit(url.strip())
+        parts.port  # noqa: B018 - raises ValueError for a non-numeric or out-of-range port
+    except ValueError:
+        return False
+    return parts.scheme in ("http", "https") and bool(parts.hostname)
+
+
+def _redact_url(url: str) -> str:
+    """``url`` with everything between the scheme and the last ``@`` shown as ``***``."""
+    if "@" not in url:
+        return url
+    scheme, sep, rest = url.partition("://")
+    if not sep:
+        scheme, rest = "", url
+    return f"{scheme}{sep}***@{rest.rsplit('@', 1)[1]}"
+
+
 def _egress_provider(cfg: DoctorConfig) -> EgressProvider | None:
     if cfg.egress_proxy_url is not None:
         return ProxyEgressProvider(cfg.egress_proxy_url)
@@ -212,7 +232,8 @@ def _host_checks(
     cfg: DoctorConfig, policy_path: Path, policy_ok: bool
 ) -> tuple[list[DoctorCheck], tuple[str, ...]]:
     provider, provider_desc = _secret_provider(cfg)
-    egress = _egress_provider(cfg)
+    proxy_bad = cfg.egress_proxy_url is not None and not _proxy_url_ok(cfg.egress_proxy_url)
+    egress = None if proxy_bad else _egress_provider(cfg)
     shipper: AuditShipper | None = (
         FileAuditShipper(cfg.audit_ship_destination)
         if cfg.audit_ship_destination is not None
@@ -251,7 +272,14 @@ def _host_checks(
     else:
         checks.append(DoctorCheck("host.secret_provider", True, "pass", provider_desc))
 
-    if "egress_not_configured" in codes:
+    if proxy_bad:
+        assert cfg.egress_proxy_url is not None
+        checks.append(DoctorCheck(
+            "host.egress", True, "fail",
+            f"proxy: malformed URL {_redact_url(cfg.egress_proxy_url)!r}",
+            "use http://HOST:PORT (e.g. containment-egress-proxy)",
+        ))
+    elif "egress_not_configured" in codes:
         checks.append(DoctorCheck(
             "host.egress", True, "fail", "egress_not_configured",
             f"pass --egress-pinned or --egress-proxy URL (or set {PINNED_ENV}=1 / {PROXY_ENV})",
@@ -259,15 +287,8 @@ def _host_checks(
     else:
         assert egress is not None
         url = egress.proxy_url
-        parts = urlsplit(url) if url is not None else None
-        if parts is not None and (parts.scheme not in ("http", "https") or not parts.hostname):
-            checks.append(DoctorCheck(
-                "host.egress", True, "fail", f"proxy: malformed URL {url!r}",
-                "use http://HOST:PORT (e.g. containment-egress-proxy)",
-            ))
-        else:
-            detail = f"proxy {url}" if url is not None else "pinned (resolve-pin client)"
-            checks.append(DoctorCheck("host.egress", True, "pass", detail))
+        detail = f"proxy {_redact_url(url)}" if url is not None else "pinned (resolve-pin client)"
+        checks.append(DoctorCheck("host.egress", True, "pass", detail))
 
     if "audit_shipper_missing" in codes:
         checks.append(DoctorCheck(
@@ -297,7 +318,7 @@ def _host_checks(
         for name in names:
             try:
                 provider.get_bytes(name)
-            except SecretError as exc:
+            except (SecretError, OSError) as exc:
                 problems.append(str(exc))
         if problems:
             checks.append(DoctorCheck(

@@ -94,7 +94,7 @@ files = FileSecretProvider("/var/run/containment/secrets")
 
 `CapabilityMinter` and HMAC `IntentSigner` load bytes via the provider inside
 `build_enterprise_host`. Optional Ed25519: pass `intent_signer=Ed25519IntentSigner(...)`
-(requires the `crypto` extra: `pip install "containment[crypto] @ git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.7.0"`).
+(requires the `crypto` extra: `pip install "containment[crypto] @ git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.7.1"`).
 
 ## AuditShipper
 

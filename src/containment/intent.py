@@ -205,10 +205,11 @@ class Ed25519IntentSigner:
                 Ed25519PublicKey,
             )
         except ImportError as exc:
+            from containment.doctor import extra_install_hint
+
             raise IntentError(
                 "Ed25519IntentSigner requires the cryptography package; "
-                'install with pip install "containment[crypto] @ '
-                'git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git"'
+                f"install with {extra_install_hint('crypto')}"
             ) from exc
 
         self.key_id = key_id
@@ -262,10 +263,11 @@ class Ed25519IntentSigner:
                 Ed25519PrivateKey,
             )
         except ImportError as exc:
+            from containment.doctor import extra_install_hint
+
             raise IntentError(
                 "Ed25519IntentSigner requires the cryptography package; "
-                'install with pip install "containment[crypto] @ '
-                'git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git"'
+                f"install with {extra_install_hint('crypto')}"
             ) from exc
         return cls(Ed25519PrivateKey.generate(), key_id=key_id)
 

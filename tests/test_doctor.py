@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -156,6 +157,44 @@ def test_proxy_url_passes_and_composes(tmp_path: Path, secrets_dir: Path) -> Non
     assert report.ok is True
 
 
+@pytest.mark.parametrize("url", ["http://[::1", "   ", "http://h:99999", "http://h:x", "ftp://h"])
+def test_unusable_proxy_url_fails_without_crash(
+    tmp_path: Path, secrets_dir: Path, url: str
+) -> None:
+    report = run_doctor(_ready(tmp_path, secrets_dir, egress_pinned=False, egress_proxy_url=url))
+    assert _status(report, "host.egress") == ("fail", f"proxy: malformed URL {url!r}")
+    assert _status(report, "host.compose")[0] == "skip"
+    assert report.exit_code == 1
+
+
+def test_proxy_credentials_never_appear_in_output(tmp_path: Path, secrets_dir: Path) -> None:
+    good = run_doctor(_ready(
+        tmp_path, secrets_dir, egress_pinned=False, egress_proxy_url="http://u:s3cret@proxy:8899"
+    ))
+    assert _status(good, "host.egress") == ("pass", "proxy http://***@proxy:8899")
+    bad = run_doctor(_ready(
+        tmp_path, secrets_dir, egress_pinned=False, egress_proxy_url="http://u:s3cret@proxy:0x"
+    ))
+    assert _status(bad, "host.egress") == ("fail", "proxy: malformed URL 'http://***@proxy:0x'")
+    for report in (good, bad):
+        assert "s3cret" not in format_report(report) + json.dumps(report.as_dict())
+
+
+def test_unreadable_secret_fails_with_report(tmp_path: Path, secrets_dir: Path) -> None:
+    (secrets_dir / "intent").chmod(0o000)
+    try:
+        report = run_doctor(_ready(tmp_path, secrets_dir))
+    finally:
+        (secrets_dir / "intent").chmod(0o600)
+    status, detail = _status(report, "host.secrets")
+    if status == "pass":  # running as root ignores file modes
+        pytest.skip("filesystem permissions not enforced for this user")
+    assert status == "fail"
+    assert "Permission denied" in detail
+    assert _status(report, "host.compose")[0] == "skip"
+    assert report.exit_code == 1
+
+
 def test_unwritable_audit_destination_fails(tmp_path: Path, secrets_dir: Path) -> None:
     ro = tmp_path / "ro"
     ro.mkdir()
@@ -239,3 +278,21 @@ def test_cli_conflicting_flags_exit_2() -> None:
     with pytest.raises(SystemExit) as exc:
         main(["doctor", "--egress-pinned", "--egress-proxy", "http://p:1"])
     assert exc.value.code == 2
+
+
+def test_runtime_extra_hints_pin_this_version(monkeypatch: pytest.MonkeyPatch) -> None:
+    from containment.capability_store_redis import RedisConsumeStore
+    from containment.intent import Ed25519IntentSigner
+
+    pinned = f"prompt-injection-defense.git@v{__version__}\""
+    monkeypatch.setitem(sys.modules, "cryptography.hazmat.primitives.asymmetric.ed25519", None)
+    monkeypatch.setitem(sys.modules, "redis", None)
+    for build in (
+        Ed25519IntentSigner,
+        Ed25519IntentSigner.generate,
+        lambda: RedisConsumeStore(url="redis://127.0.0.1:6379/0"),
+    ):
+        with pytest.raises(Exception) as exc:
+            build()
+        assert pinned in str(exc.value)
+        assert 'pip install "containment[' in str(exc.value)
