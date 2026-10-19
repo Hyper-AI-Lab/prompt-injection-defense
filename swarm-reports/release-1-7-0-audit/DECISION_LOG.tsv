@@ -7,3 +7,5 @@ ts	phase	decision	why	evidence	result
 2026-10-19T09:47:52+09:00	swarm	keep attestation main-ref match as note	reproducible build; tag-bound verify holds	slice-G	accepted
 2026-10-19T09:51:35+09:00	fix	G1-G6 surgical fixes with tests	evidenced ISSUES only	doctor.py intent.py capability_store_redis.py pyproject sdist BOT_PLAYBOOK + 10 tests	VERIFIED
 2026-10-19T09:51:35+09:00	version	bump 1.7.1	doctor behaviour + error hints changed	gate 347 passed ASR 0.0000	decided
+2026-10-19T09:57:17+09:00	release	cut 1.7.1 via cut_release.sh --execute	fixes landed; law step 5	publish run 39182904057; release v1.7.1; attest verify 0/0	VERIFIED
+2026-10-19T09:57:17+09:00	ops	recreated /workspace/.venvs/containment	its pip was broken; needed for pin update	containment 1.7.1 doctor 2/2	done

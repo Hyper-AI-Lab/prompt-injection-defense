@@ -2618,3 +2618,27 @@ Law step 4. Surgical fixes for evidenced GAPs only, each locked by a test.
 - Build 1.7.1: `twine check --strict` PASSED; unpacked sdist pytest **347 passed, 2 skipped**; wheel venv doctor 8/8, bad/credential proxy → FAIL / redacted with valid JSON, unreadable secret → FAIL with JSON; eval card gate=PASS; reference host 3/3
 
 ### Verdict: VERIFIED
+
+## Release 1.7.0 Audit — Steps 5–6 Release 1.7.1 (post-push) — 2026-10-19 JST
+
+### Scope
+Law steps 5–6. Cut 1.7.1 per `docs/RELEASE.md`; update shared skill + box venv; log.
+
+### Evidence
+- Release commit `a5c4b6d` — *Release containment 1.7.1 — 1.7.0 audit harden*; push `6155a1f..a5c4b6d main -> main`
+- CI on main (run 39182681867): **success**
+- `cut_release.sh 1.7.1` dry run exit 0 (gate 347 passed, 2 skipped; card PASS sha a5c4b6dfdbd5; local build OK)
+- `cut_release.sh 1.7.1 --execute` exit 0: annotated tag `v1.7.1` → `a5c4b6d`; publish run 39182904057 **success** (build success, publish skipped); wheel + sdist attestation verified (tag + workflow bound); release created
+- https://github.com/Hyper-AI-Lab/prompt-injection-defense/releases/tag/v1.7.1 — not draft, published 2026-10-19 09:55 JST; assets `containment-1.7.1-py3-none-any.whl`, `containment-1.7.1.tar.gz`, `eval-card.json`, `eval-card.md`
+- Consumer path (fresh dir/venv): `gh release download` → `gh attestation verify --source-ref refs/tags/v1.7.1 --signer-workflow …/publish.yml` wheel 0 / sdist 0 → `pip install` wheel → `containment 1.7.1`; `doctor --install-only` OK 2/2; reference host 3/3; card JSON 1.7.1 / a5c4b6dfdbd5, ON 0.0, OFF 1.0, both gates true
+- Shared skill `/home/box/agent-data/workflows/containment-untrusted-content/SKILL.md` pins `v1.7.1`
+- `/workspace/.venvs/containment`: its pip was broken (`No module named 'pip._internal.operations.build'`); recreated with `venv --clear`, installed `@v1.7.1` from the git tag → `containment 1.7.1`, doctor install-only OK 2/2
+- PyPI: not published (G0 pending; no repo settings changed)
+
+### Done predicate (audit law)
+1 matrix ✔ · 2 fresh baseline ✔ (337 passed / 2 skipped, ASR 0.0000 at 1.7.0; 347 / 2 at 1.7.1) · 3 slices + aggregate + decision log ✔ · 4 G1–G6 fixed with tests, gate 0, ASR 0.0000, card PASS ✔ · 5 1.7.1 cut, CI green, attestations verify, skill + venv updated ✔
+
+### Residuals
+Unchanged: card out of gate; actions pinned by major tag; host-owned isolation / egress / WORM / secret rotation; PyPI off until G0; earlier Bar C–E residuals. New notes: reproducible builds let pre-tag `main` attestations match release digests (tag-bound verify still holds); open green Dependabot PRs for ci.yml actions await K.
+
+### Verdict: VERIFIED
