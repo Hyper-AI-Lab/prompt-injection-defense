@@ -2704,3 +2704,20 @@ Shared skill `/home/box/agent-data/workflows/containment-untrusted-content/SKILL
 miss paraphrased steering without these cues; policy remains the primary control.
 
 ### Verdict: VERIFIED
+
+## Detector 1.8.0 — Step 1 (audit) — 2026-11-05 JST
+
+### Evidence
+- Plan `DETECTOR_1_8_0_PLAN.md` written (law). Audit sources: `KIRILL_RESEARCH.md` detector
+  cascade section, `DEVELOPMENT_PLAN.md` steps 7–8/17, `DECISIONS.md`, code at `fb88cc6`.
+- Production cascade = Stage-0 regex only; Stage 1 default `RulesOnlyDetector` mirrors
+  Stage 0; Stage 2 NoOp. PIGuard / Prompt Guard 2 / StackOne adapters never run with real
+  weights (no `[ml]` install, no recall/FPR ever logged).
+- `eval_runner._INSTRUCTION_HINT_RE` counts toward `detector_block_rate` but is not in the
+  production cascade.
+- Candidate models probed on the 64/47 fixtures (ONNX, box CPU, 4 threads, single text):
+  Horizon-Labs guard-small int8 recall@0.5 60/64, FP 1/47, 10.7 ms; guard-base int8 61/64,
+  FP 2/47, 26.4 ms; ProtectAI deberta-v3-base v2 56/64, FP 6/47, 27.4 ms. File hashes of the
+  small model match its published `SHA256SUMS`.
+
+### Verdict: VERIFIED (audit: not implemented per plan — ML Stage 1 never shipped/measured)
