@@ -68,7 +68,7 @@ from containment.intent import (
     intent_payload_bytes,
     plan_hash,
 )
-from containment.labels import SecurityLabel
+from containment.labels import SecurityLabel, derive_label
 from containment.moltbook import MOLTBOOK_SUMMARY_SCHEMA, MoltbookError, read_posts
 from containment.plan import IntentEnvelope, Plan, PlanStep
 from containment.policy import PolicyEngine, PolicyRule
@@ -96,7 +96,7 @@ from containment.url_guard import (
     parse_egress_url,
 )
 
-__version__ = "1.7.1"
+__version__ = "1.7.2"
 
 __all__ = [
     "ALLOWLIST_SUMMARY_SCHEMA",
@@ -179,6 +179,7 @@ __all__ = [
     "closed_object_schema",
     "extract",
     "fetch_url",
+    "derive_label",
     "ingest",
     "mark",
     "open_pinned_urllib",

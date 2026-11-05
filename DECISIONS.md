@@ -417,3 +417,36 @@ Card out of `release_gate`; actions pinned by major tag; host-owned isolation / 
 enforcement / WORM / secret rotation; PyPI off until G0. Reproducible builds mean a
 pre-tag `workflow_dispatch` attestation on `main` can match release digests; consumers bind
 with `--source-ref refs/tags/vX.Y.Z`.
+
+## 2026-11-05 — 2026-11 threat check detector coverage (→ 1.7.2)
+
+### Detector rules for new steering techniques — **ADOPT**
+- Context: the 2026-11 threat check added 11 techniques (Log-To-Leak tool descriptions,
+  goal-decomposition diagnostics, codegen URL exfil, rule-file package swap, forged
+  reasoning, session-summary spoof, 403 fallback steering, "do this first" banners,
+  refusal-word bans, CSS-hidden email text, Morse). Policy blocked all 11; the detector
+  flagged 0/11, so a host with a looser policy had no second layer.
+- Decision: deterministic Stage-0 rules, one finding kind per technique, weight 0.45
+  (single hit → `suspicious` → `high_risk`, privileged sinks fail closed). Directive rules
+  read NFKC text with invisibles removed. Multi-part rules are proximity checks over
+  precomputed match positions (bisect), not nested lazy regexes: a 250 KB adversarial
+  input scans in < 0.5 s on the box.
+- FP guard: one benign near-miss fixture per rule (docs that say "you must call
+  client.close()", a security checklist that mentions API keys and an email address,
+  `"?page=" + str(page)`, `import ujson as json`, `<thead>`, "the user approved",
+  "Error 401 … Workaround: sign in again", "support agents must first verify", a style
+  guide word ban, visible white-on-dark HTML, dashes and dots). Look-alike packages need
+  edit distance ≤ 2 and no affix relation, so `ujson`/`json` and `httpx`/`requests` pass.
+- Rejected: an ML classifier change (out of scope for a patch); keyword-only rules for
+  "send" / "post" (blog-post and "email support@" false positives).
+
+### Trust propagation for derived content — **ADOPT**
+- `derive_label(inputs, …)`: lowest integrity, highest confidentiality, merged
+  transformations; empty input list raises. `ingest(..., derived_from=...)` applies it so
+  a compaction summary or translation of untrusted text stays untrusted even if the caller
+  passes `integrity="trusted"`.
+
+### Accepted residuals
+Rules are lexical: paraphrased steering without these cues still relies on policy (the
+primary control). Hidden-text detection covers inline `style` attributes, not stylesheet
+classes. Unchanged: PyPI off until G0; host-owned isolation / egress / WORM.

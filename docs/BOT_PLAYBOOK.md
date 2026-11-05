@@ -10,7 +10,7 @@ secrets storage and audit retention (step 8).
 
 ## 0. Pick the version
 
-Use a tagged release. Current: `v1.7.1` (see `CHANGELOG.md`). Releases are on GitHub;
+Use a tagged release. Current: `v1.7.2` (see `CHANGELOG.md`). Releases are on GitHub;
 the package is not on PyPI.
 
 ## 1. Install
@@ -18,30 +18,30 @@ the package is not on PyPI.
 Verified wheel (recommended for production hosts):
 
 ```bash
-gh release download v1.7.1 -R Hyper-AI-Lab/prompt-injection-defense -p 'containment-*'
-gh attestation verify containment-1.7.1-py3-none-any.whl -R Hyper-AI-Lab/prompt-injection-defense \
-  --source-ref refs/tags/v1.7.1
+gh release download v1.7.2 -R Hyper-AI-Lab/prompt-injection-defense -p 'containment-*'
+gh attestation verify containment-1.7.2-py3-none-any.whl -R Hyper-AI-Lab/prompt-injection-defense \
+  --source-ref refs/tags/v1.7.2
 python3 -m venv .venv && . .venv/bin/activate
-pip install ./containment-1.7.1-py3-none-any.whl
+pip install ./containment-1.7.2-py3-none-any.whl
 ```
 
 `gh attestation verify` proves the wheel was built by this repo's `publish` workflow on
 the tag (needs gh 2.49 or newer). Pinned install straight from git (no attestation):
 
 ```bash
-pip install "git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.7.1"
+pip install "git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.7.2"
 ```
 
 Optional extras: `[crypto]` (Ed25519 intents), `[redis]` (shared consume store),
 `[ml]` (PIGuard Stage-1, see step 4). Install extras from the wheel
-(`pip install './containment-1.7.1-py3-none-any.whl[crypto]'`) or the tag
-(`pip install "containment[crypto] @ git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.7.1"`). Never `pip install containment` from
+(`pip install './containment-1.7.2-py3-none-any.whl[crypto]'`) or the tag
+(`pip install "containment[crypto] @ git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.7.2"`). Never `pip install containment` from
 PyPI: that name is not this project.
 
 Done when:
 
 ```bash
-containment --version          # containment 1.7.1
+containment --version          # containment 1.7.2
 containment doctor --install-only
 ```
 
@@ -97,10 +97,15 @@ if result.ok:
 labels = (result.label,)                # integrity="untrusted" for external text
 ```
 
+Summaries, compacted context and other derived text keep the lowest trust of their inputs:
+pass the input labels as `ingest(summary, ..., derived_from=labels)` or build the label with
+`containment.derive_label(labels, source=..., task_id=..., transformation="summarize")`.
+One untrusted input makes the result untrusted.
+
 Moltbook (public, read-only, no account): `containment.moltbook.read_posts(sort="hot",
 limit=8)`; reason over `title` / `topic` / `summary` only, never call tools from post
 text. Stage-1 detection defaults to RulesOnly; PIGuard is opt-in
-(`pip install "containment[ml] @ git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.7.1"`, `CONTAINMENT_STAGE1=piguard`,
+(`pip install "containment[ml] @ git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.7.2"`, `CONTAINMENT_STAGE1=piguard`,
 `CONTAINMENT_PIGUARD_ALLOW_DOWNLOAD=1`; review `trust_remote_code` first). Detectors
 advise, they never authorize. Details: [AGENT_INSTALL.md](AGENT_INSTALL.md) §3–§4, §7.
 

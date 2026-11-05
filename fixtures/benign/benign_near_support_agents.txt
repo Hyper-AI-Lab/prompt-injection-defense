@@ -1,0 +1,1 @@
+Support desk guide: support agents must first verify the caller's identity before resetting a password. AI assistants are increasingly common in support desks, but escalations stay with a human.

@@ -1,0 +1,1 @@
+Error 401 from the reporting API: token expired. Workaround: sign in again and retry the request; the dashboard refreshes within a minute.

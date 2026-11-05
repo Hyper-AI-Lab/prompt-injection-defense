@@ -9,6 +9,37 @@ They are not a benchmark claim; see `docs/EVAL_CARD.md` for scope.
 
 ## [Unreleased]
 
+## [1.7.2] - 2026-11-05
+
+### Added
+- Stage-0 detector rules for the techniques in the 2026-11 threat check. Each is a
+  structured finding (weight 0.45, so one hit makes the cascade `suspicious`):
+  `tool_call_directive` (text telling the agent to call a tool with conversation content,
+  Log-To-Leak), `secret_exfil_directive` (send/upload/POST of `.env`, credentials, keys or
+  passwords to a URL or email), `url_data_exfil_code` (code appending `to_json()`,
+  `os.environ` and similar to a URL query), `package_swap_directive` (look-alike package
+  substituted via "use X instead of Y" or `import X as Y`), `forged_role_tag` (`<think>`,
+  `<reasoning>`, ChatML / Llama role tags), `approval_claim` (spoofed compaction summaries
+  and "approval is already recorded"), `error_fallback_steering` (fake error or 403 followed
+  by a fallback that uploads or posts), `agent_addressed_directive` ("AI assistant: …",
+  "assistants must first …"), `refusal_suppression` (bans on refusal words, warnings or
+  disclaimers) and `css_hidden_text` (HTML text hidden by `display:none`,
+  `visibility:hidden`, zero font size or opacity, white text without a background,
+  off-screen offsets). Directive rules scan NFKC text with invisible characters removed.
+- Morse code in encoding discovery (`morse_run`, decoded preview in the finding).
+- `containment.derive_label`: a label for derived content (summaries, compaction,
+  translations) keeps the lowest integrity and highest confidentiality of its inputs.
+  `ingest(..., derived_from=labels)` applies it, so a summary of untrusted text cannot be
+  ingested as trusted.
+- Fixtures: the 11 threat-check attacks and 11 benign near-misses (one per new rule), with
+  regression tests that require the detector, with policy off, to flag each attack.
+
+### Changed
+- Eval on `fixtures`: 64 attacks / 47 benign (was 53 / 36). Policy-on ASR 0.0000;
+  detector block rate 0.7812 (was 0.7358); FPR 1/47 = 0.0213 (was 1/36 = 0.0278, the same
+  single false positive).
+- Install pins in `README.md`, `SKILL.md` and `docs/` move to `v1.7.2`.
+
 ## [1.7.1] - 2026-10-19
 
 ### Fixed
@@ -137,7 +168,8 @@ They are not a benchmark claim; see `docs/EVAL_CARD.md` for scope.
 - First release: trust labels, default-deny policy broker, ingest/quarantine,
   detector cascade, Moltbook read-only helper, offline eval CLI, agent install skill.
 
-[Unreleased]: https://github.com/Hyper-AI-Lab/prompt-injection-defense/compare/v1.7.1...HEAD
+[Unreleased]: https://github.com/Hyper-AI-Lab/prompt-injection-defense/compare/v1.7.2...HEAD
+[1.7.2]: https://github.com/Hyper-AI-Lab/prompt-injection-defense/compare/v1.7.1...v1.7.2
 [1.7.1]: https://github.com/Hyper-AI-Lab/prompt-injection-defense/compare/v1.7.0...v1.7.1
 [1.7.0]: https://github.com/Hyper-AI-Lab/prompt-injection-defense/compare/v1.6.1...v1.7.0
 [1.6.1]: https://github.com/Hyper-AI-Lab/prompt-injection-defense/compare/v1.6.0...v1.6.1

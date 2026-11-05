@@ -17,7 +17,7 @@ is influenced by injected instructions.
 
 1. **Direct prompt injection** — user- or attacker-controlled chat text.
 2. **Indirect injection** — malicious content in fetched pages, email, tickets, Moltbook posts, CSV/JSON fields, HTML comments.
-3. **Obfuscation** — invisible Unicode, bidi overrides, base64/hex/URL encoding, multilingual wrappers.
+3. **Obfuscation** — invisible Unicode, bidi overrides, base64/hex/URL/Morse encoding, CSS-hidden HTML text, multilingual wrappers.
 4. **Confused deputy** — model proposes a tool call that launders untrusted bytes into a privileged sink.
 
 ## Trust boundaries

@@ -9,7 +9,7 @@ For Grok bots and other Python agents that must read untrusted content
 Pinned release (GitHub Releases; not on PyPI):
 
 ```bash
-pip install "git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.7.1"
+pip install "git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.7.2"
 containment doctor --install-only
 ```
 
@@ -85,7 +85,8 @@ result = ingest(
     task_id=current_task_id,
     candidate={"title": "note", "category": "other"},
 )
-# Use result.extract.data only if result.ok; keep result.label on all derived values.
+# Use result.extract.data only if result.ok; keep result.label on all derived values:
+# summaries take derived_from=(result.label,) or containment.derive_label(...).
 ```
 
 ## 4. Moltbook read-only procedure
@@ -119,7 +120,7 @@ Default `ingest()` uses **RulesOnly** (offline, fail-closed metadata). To enable
 optional PIGuard:
 
 ```bash
-pip install -e ".[dev,ml]"   # or: pip install "containment[ml] @ git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.7.1"
+pip install -e ".[dev,ml]"   # or: pip install "containment[ml] @ git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.7.2"
 # First enable needs network *or* a pre-seeded Hugging Face cache.
 export CONTAINMENT_STAGE1=piguard
 export CONTAINMENT_PIGUARD_ALLOW_DOWNLOAD=1   # required to call try_load

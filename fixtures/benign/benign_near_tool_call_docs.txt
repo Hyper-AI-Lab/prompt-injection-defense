@@ -1,0 +1,1 @@
+Connection pooling: you must call client.close() when you are finished so the pool releases its sockets. The SDK logs request ids at debug level only.

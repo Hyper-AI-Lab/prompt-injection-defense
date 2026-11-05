@@ -35,7 +35,7 @@ untrusted bytes
 | `capability` | one-use HMAC capability tokens |
 | `audit` | append-only JSONL |
 | `broker` | reference monitor `secure_execute` |
-| `detectors.rules` | Stage0 Unicode / invisible / base64 / size |
+| `detectors.rules` | Stage0 Unicode / invisible / base64 / hex / Morse / size; steering directives (tool-call, secret exfil, package swap, role tags, approval claims, error fallbacks, refusal bans) and CSS-hidden HTML text |
 | `detectors.cascade` | Stage0→1→2 aggregation; never authorizes |
 | `detectors.piguard` | optional HF PIGuard; Fake/RulesOnly for CI |
 | `quarantine` | tool-less typed extract; closed schema |

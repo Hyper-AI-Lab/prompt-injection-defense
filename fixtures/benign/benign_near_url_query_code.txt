@@ -1,0 +1,4 @@
+for page in range(1, 4):
+    resp = requests.get("https://api.example.com/items?page=" + str(page), timeout=10)
+    rows.extend(resp.json()["items"])
+print(len(rows))

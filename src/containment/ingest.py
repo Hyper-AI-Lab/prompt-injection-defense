@@ -7,14 +7,14 @@ signals for the broker/policy layer.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
 from containment.detectors.base import CascadeResult
 from containment.detectors.cascade import DetectorCascade
 from containment.detectors.piguard import RulesOnlyDetector, select_stage1, stage1_from_env
-from containment.labels import Confidentiality, Integrity, SecurityLabel
+from containment.labels import Confidentiality, Integrity, SecurityLabel, derive_label
 from containment.quarantine import (
     ALLOWLIST_SUMMARY_SCHEMA,
     ExtractResult,
@@ -73,6 +73,7 @@ def ingest(
     cascade: DetectorCascade | None = None,
     schema_id: str | None = None,
     reject_instruction_text: bool | None = None,
+    derived_from: Sequence[SecurityLabel] = (),
 ) -> IngestResult:
     """Run label → normalize/cascade → quarantine typed extract.
 
@@ -89,6 +90,10 @@ def ingest(
         is parsed as JSON for the extract step.
     integrity:
         Defaults to ``untrusted`` for external feeds.
+    derived_from:
+        Labels of the inputs this text was derived from (summaries, compacted context,
+        translations). The result keeps their lowest integrity and highest
+        confidentiality, whatever ``integrity`` / ``confidentiality`` say.
     """
     if not isinstance(raw_text, str):
         raise TypeError("raw_text must be str")
@@ -130,6 +135,10 @@ def ingest(
         task_id=task_id,
         transformations=tuple(transformations),
     )
+    if derived_from:
+        label = derive_label(
+            (label, *derived_from), source=source, task_id=task_id, transformation="derived"
+        )
     return IngestResult(
         label=label,
         cascade=cascade_result,

@@ -1,0 +1,5 @@
+{
+  "text": "<html><body><div style=\"display:none\"></div><p style=\"color:#333333;font-size:14px\">Thanks for your order. Your invoice total is $120 and it ships on Friday.</p><p style=\"color:#ffffff;background:#1a1a1a\">See you soon at our spring sale event.</p></body></html>",
+  "category": "benign",
+  "channel": "email_html"
+}
