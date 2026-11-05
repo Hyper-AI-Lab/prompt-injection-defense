@@ -2747,3 +2747,42 @@ miss paraphrased steering without these cues; policy remains the primary control
   re-based to ≤ 13 flagged; tightened in step 3).
 
 ### Verdict: VERIFIED — gap confirmed: ~2/3 of meaning-preserving variants pass the detector
+
+## Detector 1.8.0 — Interruption note — 2026-11-05 19:59 JST
+
+The executor was interrupted after commit `a3c2a2a` (step 3 code) while starting the docs
+edits; nothing was lost (working tree clean). Resumed from the docs/version step; step 3
+code and measurements below were not redone.
+
+## Detector 1.8.0 — Step 3 (layered, wording-independent detector) — 2026-11-05 JST
+
+### Evidence
+- Stage 0 (zero-dependency): `override_phrase` (the former eval-only hint, now production;
+  eval-only hint removed from `eval_runner`), multilingual structural intent
+  (`detectors/structural.py`, EN/RU/JA + discussion-quote dampener), decode-and-rescan
+  (`detectors/decode.py`: base64/url-safe, hex, percent, ROT13 by word + letter frequency,
+  Morse, nested up to 4 layers), computed CSS hiding incl. `<style>` classes/ids/inheritance
+  (`detectors/html_hidden.py`), de-obfuscation views (invisibles → space, confusable fold),
+  `encoded_invisible`; presence-only encodings capped at 0.3 total; package-swap generalised
+  ("rather than", "in place of", вместо, の代わりに, doubled-letter typosquats);
+  `scan_chunks` adds adjacent-pair and whole-document joins.
+- Optional Stage 1 `CONTAINMENT_STAGE1=onnx[:hl-small|hl-base]`: pinned, SHA-256-verified
+  ONNX classifier (Horizon-Labs prompt-injection-guard, Apache-2.0, multilingual) fused with
+  structural cues (`LayeredDetector`); reads the text plus Stage-0 views. Fails closed
+  (`UnavailableStage1` → `error`) when deps/files/self-test fail. Fusion thresholds tuned on
+  the train split only (hl-small t_hi 0.9 / t_lo 0.8; hl-base 0.9 / 0.6; rule: max ML-layer
+  train recall with combined train FP ≤ zero-dep train FP + 1).
+- Optional Stage 2 `CONTAINMENT_STAGE2=llm`: OpenAI-compatible LLM judge, nonce-delimited
+  data, can only raise risk, fails closed.
+- `containment models list|fetch|verify`; doctor `stage1.model` check; `[ml]` extra =
+  onnxruntime + tokenizers + numpy (PIGuard moved to `[piguard]`); CI `ml-eval` job.
+- **After (train / holdout), zero-dep:** all variants 598/598 100% / 211/234 90.2%
+  (baseline 37.1% / 34.2%); benign FP 2/161 / 4/61 = 6/222 (baseline 8/222).
+- **After, ONNX hl-small:** 598/598 / 229/234 97.9%; benign FP 3/161 / 5/61 = 8/222.
+- Fixtures eval policy ON: ASR 0.0000, FPR 6/222 = 0.0270 (budget test tightened to ≤ 6).
+- Latency (8 vCPU box, load ~2.5–4.5): zero-dep 11–23 ms/KB (1.7.2: ~2 ms/KB);
+  ONNX hl-small 87 ms at 1 KB, ~145–155 ms/KB at 4–64 KB.
+- Tests: full suite green (`pytest`), new `tests/test_detector_layers.py` (31 tests; real-model
+  test runs where hl-small is fetched).
+
+### Verdict: VERIFIED (held-out paraphrase recall 34.2% → 90.2% zero-dep / 97.9% ONNX)
