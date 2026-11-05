@@ -2721,3 +2721,29 @@ miss paraphrased steering without these cues; policy remains the primary control
   small model match its published `SHA256SUMS`.
 
 ### Verdict: VERIFIED (audit: not implemented per plan — ML Stage 1 never shipped/measured)
+
+## Detector 1.8.0 — Step 2 (measure the gap) — 2026-11-05 JST
+
+### Evidence
+- `fixtures/mutations/paraphrases.yaml`: hand-written `reword` / `indirect` / `ru` / `ja` for all
+  64 attacks, written before any detector change. `src/containment/mutation_eval.py` adds
+  `synonym`, `split`, `b64`, `hex`, `url_escape`, `rot13`, `md_wrapper`, `html_comment`,
+  `css_class` → 14 families × 64 = 896 variants. Case-group split frozen in
+  `fixtures/mutations/SPLIT.md` (18 held-out cases incl. 4 of the 2026-11 techniques).
+- Benign corpus 47 → 222 (147 new hand-written realistic items incl. 40 multilingual and HTML
+  with real `<style>` classes / hidden preheaders, 28 CPython stdlib docstrings). Provenance:
+  `fixtures/benign/SOURCES.md`.
+- `CascadeResult.high_risk` (same rule as `IngestResult.high_risk`), `DetectorCascade.scan_chunks`
+  (worst chunk). CLI `containment eval --suite mutations`.
+- **Baseline, 1.7.2 production cascade, detector only** (train / holdout):
+  original 20/46 43.5% / 7/18 38.9%; reword 26.1% / 22.2%; indirect 30.4% / 27.8%;
+  ru 28.3% / 22.2%; ja 23.9% / 16.7%; synonym 43.5% / 38.9%; split 21.7% / 22.2%;
+  url_escape 8.7% / 5.6%; rot13 21.7% / 22.2%; md_wrapper, html_comment, css_class 26.1% / 22.2%;
+  b64, hex 100% / 100% (presence-only rules: they also flag hashes, JWTs, base64 images);
+  all variants 222/598 37.1% / 80/234 34.2%. Benign FP 5/161 3.1% / 3/61 4.9% (8/222).
+- With the eval-only hint regex (what 1.7.2's `detector_block_rate` reported): originals
+  36/46 / 14/18 (50/64 = 78%), but reword 12/46 / 4/18, ru 14/46 / 4/18, ja 12/46 / 3/18.
+- Fixtures eval (policy ON) on the new corpus: ASR 0.0000, FPR 13/222 = 0.0586 (budget test
+  re-based to ≤ 13 flagged; tightened in step 3).
+
+### Verdict: VERIFIED — gap confirmed: ~2/3 of meaning-preserving variants pass the detector
