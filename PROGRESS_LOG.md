@@ -2786,3 +2786,18 @@ code and measurements below were not redone.
   test runs where hl-small is fetched).
 
 ### Verdict: VERIFIED (held-out paraphrase recall 34.2% → 90.2% zero-dep / 97.9% ONNX)
+
+## Detector 1.8.0 — Step 4 (release) — 2026-11-05 JST
+
+### Evidence
+- `scripts/release_gate.sh` OK (425 passed, 3 skipped; fixtures ASR 0.0000, FPR 6/222).
+- CI run 42015623130 green on `52499bb` (gate + new `ml-eval`: model fetch + hash verify,
+  doctor with `CONTAINMENT_STAGE1=onnx`, mutation eval, real-model tests).
+- `cut_release.sh 1.8.0 --execute`: tag `v1.8.0`, publish run 42016368598 (build ✓, PyPI job
+  skipped — GitHub only), wheel + sdist attestations verified,
+  https://github.com/Hyper-AI-Lab/prompt-injection-defense/releases/tag/v1.8.0
+- Shared skill `containment-untrusted-content/SKILL.md`: pins v1.7.1 → v1.8.0 only.
+- `/workspace/.venvs/containment`: attested 1.8.0 wheel installed; `containment doctor
+  --install-only` OK 2/2.
+
+### Verdict: VERIFIED
