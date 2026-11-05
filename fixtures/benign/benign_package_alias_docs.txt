@@ -1,0 +1,3 @@
+Installing the fast JSON backend
+`pip install orjson` and then use it as a drop-in: `import orjson as json` is NOT compatible because `orjson.dumps`
+returns bytes. Wrap it instead, or keep `import json` from the standard library for simple scripts.

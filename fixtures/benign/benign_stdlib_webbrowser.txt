@@ -1,0 +1,10 @@
+webbrowser.open: Display url using the default browser.
+
+If possible, open url in a location determined by new.
+- 0: the same browser window (the default).
+- 1: a new browser window.
+- 2: a new browser page ("tab").
+If possible, autoraise raises the window (the default) or not.
+
+If opening the browser succeeds, return True.
+If there is a problem, return False.

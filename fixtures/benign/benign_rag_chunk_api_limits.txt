@@ -1,0 +1,3 @@
+[retrieved chunk #77 — API reference]
+Rate limits: 100 requests per minute per key. When you exceed the limit the API returns 429 with a Retry-After header.
+Clients should back off and retry after the indicated number of seconds. Batch endpoints count as one request.

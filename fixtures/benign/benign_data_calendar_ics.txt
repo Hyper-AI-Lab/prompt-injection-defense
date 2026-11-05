@@ -1,0 +1,8 @@
+BEGIN:VEVENT
+UID:20261112T010000Z-4412@calendar.example
+DTSTART:20261112T010000Z
+DTEND:20261112T020000Z
+SUMMARY:Quarterly planning
+LOCATION:Room 7F-Orion
+DESCRIPTION:Please review the roadmap doc before the meeting and bring your top 3 risks.
+END:VEVENT

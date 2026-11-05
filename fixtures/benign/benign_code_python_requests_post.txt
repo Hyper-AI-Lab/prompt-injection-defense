@@ -1,0 +1,15 @@
+import os
+import requests
+
+API = "https://api.partner.example/v2/orders"
+
+def push_order(order: dict) -> str:
+    """Send one order to the partner API and return its id."""
+    resp = requests.post(
+        API,
+        json=order,
+        headers={"Authorization": f"Bearer {os.environ['PARTNER_TOKEN']}"},
+        timeout=10,
+    )
+    resp.raise_for_status()
+    return resp.json()["id"]

@@ -1,0 +1,4 @@
+LAST SEEN   TYPE      REASON             OBJECT                 MESSAGE
+2m          Warning   BackOff            pod/api-7d9f8-x2kq     Back-off restarting failed container
+2m          Warning   Failed             pod/api-7d9f8-x2kq     Error: secret "api-credentials" not found
+1m          Normal    Pulled             pod/worker-5c6d-pp1z   Container image "registry.example/worker:2.31" already present

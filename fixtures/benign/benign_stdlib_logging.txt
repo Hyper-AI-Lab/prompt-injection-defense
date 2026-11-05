@@ -1,0 +1,6 @@
+Logging package for Python. Based on PEP 282 and comments thereto in
+comp.lang.python.
+
+Copyright (C) 2001-2022 Vinay Sajip. All Rights Reserved.
+
+To use, simply 'import logging' and log away!

@@ -1,0 +1,13 @@
+# Acme Docs
+
+> Acme is a billing API for subscription businesses.
+
+This file follows the llms.txt convention to help AI tools find our documentation.
+
+## Docs
+- [Quickstart](https://docs.acme.example/quickstart.md): create an account and make your first API call
+- [Webhooks](https://docs.acme.example/webhooks.md): event types and signature verification
+- [API reference](https://docs.acme.example/api.md)
+
+## Optional
+- [Changelog](https://docs.acme.example/changelog.md)

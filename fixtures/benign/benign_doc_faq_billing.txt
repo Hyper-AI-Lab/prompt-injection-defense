@@ -1,0 +1,6 @@
+Q: How do I change the card I'm billed on?
+A: Go to Settings > Billing > Payment method and click "Replace card".
+Q: Can I get an invoice with my company's tax ID?
+A: Yes — add the tax ID under Billing details before the next invoice is generated.
+Q: How do I cancel?
+A: Settings > Billing > Cancel plan. You keep access until the end of the period.

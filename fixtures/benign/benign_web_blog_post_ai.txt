@@ -1,0 +1,4 @@
+<article><h2>How we let our support agent issue refunds safely</h2>
+<p>Our AI assistant can propose refunds, but it cannot execute them. Every refund above $50 goes to a human
+reviewer who sees the ticket, the proposed amount and the customer history. The assistant has no access to
+payment credentials at all; the refund API is called by a separate service after approval.</p></article>

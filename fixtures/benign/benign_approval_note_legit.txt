@@ -1,0 +1,2 @@
+Change request CR-1042 (rotate TLS certificates on the edge proxies) was approved by the CAB on 3 November.
+Implementation window: Saturday 02:00–04:00 JST. Rollback plan: restore the previous certificate bundle from the vault.

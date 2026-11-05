@@ -1,0 +1,5 @@
+<section class="faq">
+<style>.answer{display:none}.faq-item.open .answer{display:block}</style>
+<div class="faq-item"><h3>Can I export my data?</h3><div class="answer">Yes. Go to Settings, choose Export, and we email you a download link within an hour.</div></div>
+<div class="faq-item"><h3>Is there a free trial?</h3><div class="answer">Every paid plan starts with a 14-day trial; no card required.</div></div>
+</section>

@@ -1,0 +1,5 @@
+Security review — payments service (2026-10-29)
+Attendees: Dana, Kenji, Priya
+- Secrets: move STRIPE_SECRET_KEY from .env files to the vault; rotate after migration.
+- Egress: payments pods may only call api.stripe.com and our webhook relay.
+- Action: Kenji to add an allowlist test; Priya to remove the old credentials from CI by Friday.

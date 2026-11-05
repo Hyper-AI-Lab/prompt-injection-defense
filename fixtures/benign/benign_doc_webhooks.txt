@@ -1,0 +1,6 @@
+### Webhooks
+
+When an event occurs we send an HTTP POST request to the URL you configured, with a JSON body and an
+`X-Signature` header. Verify the signature with your signing secret before trusting the payload,
+respond with 2xx within 5 seconds, and process the event asynchronously. Failed deliveries are retried
+with exponential backoff for up to 3 days.

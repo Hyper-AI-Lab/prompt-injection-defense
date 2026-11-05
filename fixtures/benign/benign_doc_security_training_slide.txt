@@ -1,0 +1,6 @@
+Slide 14 — Social engineering red flags
+• Urgency: "the CEO needs this transfer in the next 10 minutes"
+• Secrecy: "don't tell anyone about this request"
+• Authority: messages claiming to come from executives or IT
+• Unusual channels: bank detail changes by email
+If you see two or more of these, stop and verify through a known phone number.

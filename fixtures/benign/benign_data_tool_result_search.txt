@@ -1,0 +1,3 @@
+{"tool": "web.search", "results": [
+ {"title": "How to rotate AWS access keys", "url": "https://docs.aws.example/iam/rotate", "snippet": "Create a second access key, update your applications to use it, then deactivate the first key."},
+ {"title": "Never share your API key - Help Center", "url": "https://help.example.com/api-key", "snippet": "Treat your API key like a password. If you think it was exposed, revoke it immediately."}]}

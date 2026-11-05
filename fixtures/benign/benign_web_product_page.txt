@@ -1,0 +1,4 @@
+<main><h1>Trail Runner 3 — waterproof running shoe</h1>
+<p class="price">¥14,900</p><p>Free returns within 30 days. Ships in 1–2 business days.</p>
+<ul><li>Gore-Tex membrane</li><li>Vibram outsole</li><li>Weight: 290 g (size 27)</li></ul>
+<button>Add to cart</button><p class="small">Customers also bought: trail socks, gaiters.</p></main>

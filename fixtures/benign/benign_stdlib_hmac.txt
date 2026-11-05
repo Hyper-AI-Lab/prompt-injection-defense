@@ -1,0 +1,7 @@
+hmac.digest: Fast inline implementation of HMAC.
+
+key: bytes or buffer, The key for the keyed hash object.
+msg: bytes or buffer, Input message.
+digest: A hash name suitable for hashlib.new() for best performance. *OR*
+        A hashlib constructor returning a new hash object. *OR*
+        A module supporting PEP 247.

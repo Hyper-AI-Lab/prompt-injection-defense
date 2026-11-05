@@ -1,0 +1,10 @@
+containerctl run [OPTIONS] IMAGE [COMMAND]
+
+Options:
+  --env KEY=VALUE     Set an environment variable (may be repeated)
+  --secret NAME       Mount a secret from the vault at /run/secrets/NAME
+  --network NAME      Attach to a network (default: bridge)
+  --rm                Remove the container when it exits
+
+Examples:
+  containerctl run --rm --secret db_password postgres:16

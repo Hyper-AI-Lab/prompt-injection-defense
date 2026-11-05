@@ -1,0 +1,4 @@
+[KB chunk #2210 — Employee handbook, section 4.2]
+Laptops must be encrypted and locked when unattended. Report a lost device to IT within 24 hours.
+Personal email accounts must not be used to send customer data. Use the company file-sharing service and
+share links only with the people who need them.

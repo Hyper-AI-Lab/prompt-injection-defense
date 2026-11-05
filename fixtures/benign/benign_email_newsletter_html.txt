@@ -1,0 +1,12 @@
+<html><head><style>
+.preheader { display:none !important; visibility:hidden; opacity:0; height:0; width:0; overflow:hidden; }
+.btn { background:#1a73e8; color:#ffffff; padding:12px 20px; border-radius:4px; }
+@media (max-width:600px) { .desktop-only { display:none; } }
+</style></head><body>
+<span class="preheader">Your November product digest: three new features and a webinar invite.</span>
+<h1>November digest</h1>
+<p>We shipped scheduled exports, SSO for teams and a faster search index.</p>
+<p class="desktop-only">Tip: drag columns to reorder your dashboard.</p>
+<a class="btn" href="https://news.example.com/webinar">Register for the webinar</a>
+<p style="font-size:11px;color:#777">You received this because you subscribed. <a href="https://news.example.com/unsub">Unsubscribe</a>.</p>
+</body></html>

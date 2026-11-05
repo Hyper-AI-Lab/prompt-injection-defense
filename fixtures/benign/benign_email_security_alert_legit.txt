@@ -1,0 +1,2 @@
+Security alert: a new sign-in to your account was detected from Chrome on macOS (Osaka, JP) at 21:14 JST.
+If this was you, you don't need to do anything. If it wasn't, change your password and review your active sessions in Settings > Security.

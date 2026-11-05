@@ -1,0 +1,5 @@
+Writing a good system prompt for your support bot
+
+Start by stating the role: "You are a support assistant for Acme's billing product."
+Then list what it should and should not do, e.g. "Answer billing questions; for refunds above $500, hand off to a human."
+Keep the prompt short, test it with real tickets, and version it alongside your code.

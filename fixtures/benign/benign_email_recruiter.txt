@@ -1,0 +1,8 @@
+Hi Kirill,
+
+I came across your work on agent security and wanted to reach out about a Staff Engineer role on our platform team.
+The role is remote-friendly (APAC hours) and focuses on sandboxing and policy enforcement for LLM tools.
+Would you be open to a 20-minute call next week? Just reply with a couple of times that suit you.
+
+Best,
+Jordan

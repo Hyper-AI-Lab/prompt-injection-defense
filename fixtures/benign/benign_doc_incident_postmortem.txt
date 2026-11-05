@@ -1,0 +1,5 @@
+Postmortem: elevated 502s on 2026-10-21
+Impact: 7% of checkout requests failed for 23 minutes.
+Root cause: a config change reduced the upstream keepalive timeout below the load balancer's idle timeout.
+What went well: alert fired within 2 minutes. What went badly: rollback required manual approval from an absent owner.
+Action items: add config validation in CI; allow on-call to approve rollbacks.

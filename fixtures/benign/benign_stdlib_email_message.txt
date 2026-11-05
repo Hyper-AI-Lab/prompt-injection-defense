@@ -1,0 +1,33 @@
+email.message.Charset: Map character sets to their email properties.
+
+This class provides information about the requirements imposed on email
+for a specific character set.  It also provides convenience routines for
+converting between character sets, given the availability of the
+applicable codecs.  Given a character set, it will do its best to provide
+information on how to use that character set in an email in an
+RFC-compliant way.
+
+Certain character sets must be encoded with quoted-printable or base64
+when used in email headers or bodies.  Certain character sets must be
+converted outright, and are not allowed in email.  Instances of this
+module expose the following information about a character set:
+
+input_charset: The initial character set specified.  Common aliases
+               are converted to their `official' email names (e.g. latin_1
+               is converted to iso-8859-1).  Defaults to 7-bit us-ascii.
+
+header_encoding: If the character set must be encoded before it can be
+                 used in an email header, this attribute will be set to
+                 charset.QP (for quoted-printable), charset.BASE64 (for
+                 base64 encoding), or charset.SHORTEST for the shortest of
+                 QP or BASE64 encoding.  Otherwise, it will be None.
+
+body_encoding: Same as header_encoding, but describes the encoding for the
+               mail message's body, which indeed may be different than the
+               header encoding.  charset.SHORTEST is not allowed for
+               body_encoding.
+
+output_charset: Some character sets must be converted before they can be
+                used in email headers or bodies.  If the input_charset is
+                one of them, this attribute will contain the name of the
+                charset output will be con

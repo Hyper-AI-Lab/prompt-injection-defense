@@ -1,0 +1,2 @@
+Please add this public key to the deploy user on staging:
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGq3n0bV1r1mX2pQ8wz4cK7yT5hL9dF0sJ2uE6aB3cDx deploy@ci-runner-04

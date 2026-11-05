@@ -1,0 +1,3 @@
+Example of a phishing email we received last week (do NOT act on it):
+"Your mailbox is full. Click here and enter your password to keep receiving messages."
+Notice the generic greeting, the urgency and the link to a non-company domain. Report such emails with the Phish button.

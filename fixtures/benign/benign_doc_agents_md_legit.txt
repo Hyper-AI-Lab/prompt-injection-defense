@@ -1,0 +1,10 @@
+# AGENTS.md
+
+## Build & test
+- Use `uv run pytest -q` to run tests; all tests must pass before you open a PR.
+- Run `ruff check --fix` and `ruff format` before committing.
+
+## Conventions
+- Prefer `pathlib` over `os.path`.
+- Use `httpx` instead of `requests` for new HTTP code (async support).
+- Write docstrings for public functions. Keep functions under 50 lines.

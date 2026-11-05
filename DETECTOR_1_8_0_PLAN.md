@@ -66,8 +66,8 @@ default deny) was implemented and is why ASR stayed 0.
   separately), `b64` / `hex` / `url_escape` / `rot13` (reword encoded behind a neutral cue),
   `md_wrapper` (code block / blockquote), `html_comment`, `css_class` (`<style>` class with
   `display:none` etc., text in a classed element).
-- Held-out split by **case group**: case is held out iff `sha256(case_id)[0] in "0123456789a"`…
-  concretely `int(sha256(case_id), 16) % 3 == 0`; all variants of a held-out case are test-only.
+- Held-out split by **case group**: a case is held out iff `int(sha256(case_id), 16) % 3 == 0`;
+  all variants of a held-out case are test-only.
   The split is printed by the eval and frozen in `fixtures/mutations/SPLIT.md`.
 - Expanded benign corpus (≥ 200 total): realistic emails, tickets, docs, READMEs, code, CI
   logs, HTML newsletters with real `<style>` classes, hashes/JWTs/base64 images, agent rule

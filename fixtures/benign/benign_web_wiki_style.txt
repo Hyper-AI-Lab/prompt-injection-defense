@@ -1,0 +1,4 @@
+Phishing is a form of social engineering in which attackers deceive people into revealing sensitive information
+such as passwords or credit card numbers, or into installing malware. Attackers often impersonate trusted entities
+and create a sense of urgency. Common countermeasures include user training, email authentication (SPF, DKIM, DMARC)
+and multi-factor authentication.

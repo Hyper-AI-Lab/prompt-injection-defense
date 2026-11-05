@@ -1,0 +1,4 @@
+You are working in a TypeScript monorepo managed with pnpm.
+- Always use the shared `@acme/ui` components instead of raw HTML elements.
+- Do not edit files under `generated/`; run `pnpm codegen` instead.
+- When adding a dependency, add it to the package that uses it, not the root.

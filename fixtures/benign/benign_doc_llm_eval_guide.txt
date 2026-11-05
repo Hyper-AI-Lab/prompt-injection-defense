@@ -1,0 +1,3 @@
+When evaluating an LLM agent, keep a fixed test set and record the model version, temperature and system prompt
+for every run. Measure task success, cost and latency. For safety evaluations, include adversarial inputs such as
+jailbreak attempts and prompt injections in retrieved documents, and track how often the agent takes an unsafe action.

@@ -1,0 +1,4 @@
+Feature flags
+To enable the new editor for your account, open Settings > Labs and turn on "New editor".
+Admins can roll it out to the whole workspace from the admin console. Turning it off restores the classic editor;
+your documents are not affected.

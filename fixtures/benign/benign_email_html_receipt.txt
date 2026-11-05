@@ -1,0 +1,4 @@
+<html><head><style>.muted{color:#888;font-size:12px}.total{font-weight:bold}</style></head>
+<body><p>Thanks for your purchase!</p>
+<table><tr><td>USB-C dock</td><td>¥12,800</td></tr><tr><td class="total">Total</td><td class="total">¥12,800</td></tr></table>
+<p class="muted">Order 2026-11-04-7781. Questions? Reply to this email.</p></body></html>

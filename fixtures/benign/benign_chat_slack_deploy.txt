@@ -1,0 +1,2 @@
+@here deploying api v2.31 to prod in 10 min. Please hold merges to main until I post the all-clear.
+If you see 5xx spikes on the dashboard, ping #incident and roll back with `make rollback VERSION=2.30`.

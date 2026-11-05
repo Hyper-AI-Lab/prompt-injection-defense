@@ -1,0 +1,4 @@
+Summary of earlier discussion:
+- The team agreed to postpone the database migration to next sprint.
+- Kenji will draft the rollback plan; Priya will review it on Thursday.
+- Open question: whether to keep the read replica in the old region. No decision yet.

@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# Deploy the static site. Requires AWS credentials from the CI role.
+npm ci
+npm run build
+aws s3 sync dist/ "s3://${BUCKET}/" --delete
+aws cloudfront create-invalidation --distribution-id "$CF_DIST" --paths "/*"
+echo "deployed $(git rev-parse --short HEAD)"

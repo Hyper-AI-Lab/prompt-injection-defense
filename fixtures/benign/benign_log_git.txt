@@ -1,0 +1,11 @@
+commit 3f9c2a7e1b4d8f0a6c5e9d2b1a7f3e8c4d6b2a90
+Author: Kenji Sato <kenji@example.com>
+Date:   Tue Nov 3 18:22:41 2026 +0900
+
+    fix(auth): reject expired refresh tokens
+
+commit a1b2c3d4e5f60718293a4b5c6d7e8f9012345678
+Author: Dana Lee <dana@example.com>
+Date:   Mon Nov 2 10:05:13 2026 +0900
+
+    chore(deps): bump httpx from 0.27.2 to 0.28.1

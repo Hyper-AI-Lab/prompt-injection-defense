@@ -1,0 +1,6 @@
+[[package]]
+name = "certifi"
+version = "2026.10.5"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b0/ee/9b1906/certifi-2026.10.5.tar.gz", hash = "sha256:47c09d31ccf2acf0be3f701ea53595ee7e0b8fa08801c6624be771df09ae7b29" }
+wheels = [{ url = "https://files.pythonhosted.org/packages/12/90/3c9ff0/certifi-2026.10.5-py3-none-any.whl", hash = "sha256:922820b53db7a7257ffbda3f597266d435245903d80737e34f8a45ff3e3230d8" }]

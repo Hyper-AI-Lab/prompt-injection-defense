@@ -1,0 +1,3 @@
+Ticket #90812 — Priority: normal
+Customer: "I was charged twice for the Pro plan this month. Please refund one of the charges and confirm by email."
+Agent notes: verified duplicate charge in Stripe dashboard (ch_3Q...1fA, ch_3Q...9kB). Refund issued for the second one.

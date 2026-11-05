@@ -1,0 +1,4 @@
+In this tutorial we build a small retrieval-augmented chatbot. First, split your documents into chunks of about
+500 tokens, embed them, and store the vectors. At query time, retrieve the top 5 chunks and pass them to the model
+together with the user's question. Tell the model to answer only from the provided context and to say "I don't know"
+otherwise.

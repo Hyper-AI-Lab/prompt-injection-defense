@@ -13,8 +13,27 @@ from containment.doctor import DoctorConfig, config_from_env, format_report, run
 from containment.eval_runner import default_fixtures_root, run_eval
 
 
+def _cmd_eval_mutations(args: argparse.Namespace, root: Path) -> int:
+    from containment.ingest import default_ingest_cascade
+    from containment.mutation_eval import format_report, run_mutation_eval
+
+    report = run_mutation_eval(default_ingest_cascade(), fixtures_root=root)
+    if args.json:
+        print(json.dumps(report.as_dict(), indent=2, sort_keys=True))
+    else:
+        print(
+            format_report(
+                report,
+                title="containment eval — suite=mutations — detector only (policy not used)",
+            )
+        )
+    return 0
+
+
 def _cmd_eval(args: argparse.Namespace) -> int:
     root = Path(args.fixtures) if args.fixtures else default_fixtures_root()
+    if args.suite == "mutations":
+        return _cmd_eval_mutations(args, root)
     if args.suite == "fixtures":
         fixtures_root = root
     else:
@@ -129,7 +148,10 @@ def build_parser() -> argparse.ArgumentParser:
     ev.add_argument(
         "--suite",
         default="fixtures",
-        help="Suite name (default: fixtures). Loads fixtures/attacks and fixtures/benign.",
+        help=(
+            "Suite name (default: fixtures). 'fixtures' loads fixtures/attacks and "
+            "fixtures/benign; 'mutations' runs the detector-only paraphrase eval."
+        ),
     )
     ev.add_argument(
         "--fixtures",

@@ -1,0 +1,12 @@
+From: anna.k@northwind.example
+To: team-platform@northwind.example
+Subject: Moving Thursday's sync to Friday 10:00
+
+Hi all,
+
+Because of the release freeze I'd like to move our Thursday sync to Friday at 10:00 JST.
+Please update your calendars and ignore the earlier invite I sent on Monday — it had the wrong room.
+If Friday doesn't work for you, reply to me directly and we'll find another slot.
+
+Thanks,
+Anna

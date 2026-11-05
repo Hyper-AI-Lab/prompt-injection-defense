@@ -70,6 +70,11 @@ class CascadeResult:
         if self.aggregate_label not in _VALID_LABELS:
             raise ValueError(f"invalid aggregate_label {self.aggregate_label!r}")
 
+    @property
+    def high_risk(self) -> bool:
+        """True when the aggregate is malicious/suspicious/error or any score >= 0.4."""
+        return self.aggregate_label in ("malicious", "suspicious", "error") or self.max_score >= 0.4
+
 
 @runtime_checkable
 class Stage1Detector(Protocol):

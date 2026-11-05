@@ -1,0 +1,8 @@
+<style>
+.visually-hidden { position:absolute !important; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; }
+.d-none { display:none !important; }
+.collapse:not(.show) { display:none; }
+</style>
+<button class="btn" aria-expanded="false" aria-controls="faq1">Show answer</button>
+<div class="collapse" id="faq1">You can cancel anytime from the billing page; we prorate the refund.</div>
+<span class="visually-hidden">Opens in a new tab</span>

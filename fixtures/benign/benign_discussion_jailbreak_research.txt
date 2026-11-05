@@ -1,0 +1,3 @@
+In our red-team exercise we tried several jailbreak styles against the support bot: role-play ("pretend you are DAN"),
+instruction overrides ("ignore all previous instructions"), and payload splitting. The bot refused most of them, but the
+payload-splitting variant got it to reveal an internal URL. We've filed this as SEC-212 and will add the cases to our eval set.

@@ -1,0 +1,5 @@
+customer_id,name,country,plan,mrr_usd,notes
+1001,Northwind Traders,US,pro,499,"renewal in Dec, asked about SSO"
+1002,Contoso Ltd,GB,enterprise,4200,"security review pending"
+1003,株式会社サンプル,JP,team,180,"請求書払い希望"
+1004,ООО Ромашка,RU,pro,499,"просят счёт в рублях"

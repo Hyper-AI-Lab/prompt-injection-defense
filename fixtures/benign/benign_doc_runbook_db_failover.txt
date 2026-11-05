@@ -1,0 +1,6 @@
+Runbook: Postgres primary failover
+1. Confirm the primary is unhealthy (pg_isready fails for > 2 min, alerts firing).
+2. Promote the replica: `patronictl failover --candidate db-2`.
+3. Update the connection string secret and restart the API pods: `kubectl rollout restart deploy/api`.
+4. Post a status update in #incident and open a postmortem doc.
+Do not delete the old primary's volume until the postmortem is complete.

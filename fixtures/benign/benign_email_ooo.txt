@@ -1,0 +1,2 @@
+I'm out of office until 12 November with limited access to email.
+For urgent production issues please page the on-call engineer via PagerDuty; for anything else I'll reply when I'm back.

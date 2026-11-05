@@ -1,0 +1,3 @@
+Reminder from Treasury: vendors sometimes email us asking to change their bank details.
+Never update a payee's bank account based on an email alone. Call the vendor on the number already on file,
+confirm the change, and log the call in the vendor master record before any payment run.

@@ -1,0 +1,8 @@
+export function Banner({ dismissed, onDismiss }) {
+  return (
+    <div className={dismissed ? "hidden" : "banner"} role="status">
+      Scheduled maintenance on Sunday 02:00–03:00 JST. Saved drafts will not be lost.
+      <button onClick={onDismiss}>Dismiss</button>
+    </div>
+  );
+}

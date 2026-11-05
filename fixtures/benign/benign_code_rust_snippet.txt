@@ -1,0 +1,11 @@
+fn main() -> anyhow::Result<()> {
+    let token = std::env::var("GITHUB_TOKEN")?;
+    let client = reqwest::blocking::Client::new();
+    let resp = client
+        .get("https://api.github.com/user")
+        .bearer_auth(token)
+        .header("User-Agent", "demo")
+        .send()?;
+    println!("{}", resp.status());
+    Ok(())
+}

@@ -42,11 +42,7 @@ class IngestResult:
     @property
     def high_risk(self) -> bool:
         """True when cascade aggregate is malicious/suspicious/error."""
-        return self.cascade.aggregate_label in (
-            "malicious",
-            "suspicious",
-            "error",
-        ) or self.cascade.max_score >= 0.4
+        return self.cascade.high_risk
 
 
 def default_ingest_cascade() -> DetectorCascade:

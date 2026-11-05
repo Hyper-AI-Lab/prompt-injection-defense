@@ -1,0 +1,8 @@
+export async function loadProfile(userId) {
+  const res = await fetch(`/api/users/${encodeURIComponent(userId)}`, {
+    credentials: "same-origin",
+    headers: { "Accept": "application/json" },
+  });
+  if (!res.ok) throw new Error(`profile ${res.status}`);
+  return res.json();
+}

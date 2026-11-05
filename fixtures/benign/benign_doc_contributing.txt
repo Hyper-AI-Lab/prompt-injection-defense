@@ -1,0 +1,5 @@
+Contributing
+
+Thanks for helping! Please open an issue before starting large changes.
+Fork the repository, create a branch, and send a pull request against `main`.
+Sign off your commits (`git commit -s`). We squash-merge, so keep the PR title meaningful.

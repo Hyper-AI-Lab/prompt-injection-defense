@@ -1,0 +1,3 @@
+{"data": [{"id": "evt_01", "type": "invoice.paid", "amount": 4212.5, "currency": "EUR"},
+ {"id": "evt_02", "type": "customer.updated", "changes": {"email": "new@acme.example"}}],
+ "has_more": false, "next_cursor": null}

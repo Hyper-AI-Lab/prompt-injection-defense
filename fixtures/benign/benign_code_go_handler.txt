@@ -1,0 +1,12 @@
+func (h *Handler) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if !h.authz.Can(r.Context(), "users:delete") {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	if err := h.store.Delete(r.Context(), id); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}

@@ -1,0 +1,2 @@
+Can you refactor this function to use a dictionary dispatch instead of the long if/elif chain?
+Keep the behavior identical, add type hints, and write two pytest cases for the unknown-command branch.

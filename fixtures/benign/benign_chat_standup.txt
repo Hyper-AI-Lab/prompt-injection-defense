@@ -1,0 +1,3 @@
+Yesterday: finished the retry logic for the webhook sender, opened PR #482.
+Today: address review comments, then pair with Sam on the flaky e2e test.
+Blockers: need someone with admin rights to rotate the staging Stripe key — Dana, can you do that?

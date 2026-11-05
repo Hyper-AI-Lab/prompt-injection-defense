@@ -1,0 +1,2 @@
+How to receive USDC: open the wallet, choose USDC on the Ethereum network, and share your receiving address
+(it starts with 0x). Never share your seed phrase — no support agent will ever ask for it.

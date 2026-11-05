@@ -1,0 +1,7 @@
+Hola equipo:
+
+El despliegue de la versión 2.31 será mañana a las 9:00. Por favor, no hagáis merge a main hasta que confirme que
+todo está bien. Si veis errores 5xx, avisad en #incident.
+
+Saludos,
+Lucía

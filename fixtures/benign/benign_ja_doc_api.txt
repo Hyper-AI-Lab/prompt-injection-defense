@@ -1,0 +1,7 @@
+## 認証
+
+すべてのリクエストには Authorization ヘッダーに APIキーを含める必要があります。
+
+    curl https://api.example.jp/v1/messages -H "Authorization: Bearer $API_KEY"
+
+APIキーはパスワードと同様に扱ってください。リポジトリにコミットしたり、チャットに貼り付けたりしないでください。

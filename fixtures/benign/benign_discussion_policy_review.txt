@@ -1,0 +1,2 @@
+Policy review notes: the draft says employees "must not ignore previous security guidance when new tools are introduced".
+Legal suggests rewording to "existing security guidance continues to apply". Also clarify who approves exceptions.

@@ -1,0 +1,2 @@
+Access request: please grant me read-only access to the analytics-prod BigQuery dataset for the churn analysis.
+Manager approval: attached (J. Ortiz). Duration: until 31 December. I do not need write access.

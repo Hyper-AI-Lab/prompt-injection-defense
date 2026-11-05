@@ -211,6 +211,23 @@ class DetectorCascade:
             original_sha256=s0.original_sha256,
         )
 
+    def scan_chunks(
+        self,
+        chunks: list[str],
+        *,
+        context: Mapping[str, Any] | None = None,
+    ) -> CascadeResult:
+        """Scan each chunk of one document; return the worst chunk's result."""
+        if not chunks:
+            raise ValueError("chunks must be non-empty")
+        results = [self.scan(chunk, context=context) for chunk in chunks]
+        return max(results, key=_severity)
+
+
+def _severity(result: CascadeResult) -> tuple[int, float]:
+    order = {"benign": 0, "inconclusive": 1, "suspicious": 2, "malicious": 3, "error": 4}
+    return (order[result.aggregate_label], result.max_score)
+
 
 # Re-export for discoverability at cascade/broker integration points.
 __all__ = [

@@ -119,7 +119,7 @@ def test_directive_rules_stay_fast_on_large_input(text: str) -> None:
 def test_suite_asr_zero_and_fpr_within_budget() -> None:
     metrics, outcomes = run_eval(fixtures_root=ROOT, policy_enabled=True)
     assert metrics.asr == 0.0
-    # 1.7.1 baseline: 1 false positive of 36 benign. Must not get worse.
-    assert metrics.fpr <= 1 / 36
-    flagged = sorted(o.case.path.name for o in outcomes if o.false_positive)
-    assert flagged == ["benign_system_prompt_docs.txt"]
+    # 1.8.0 step-2 baseline on the expanded benign corpus (222): 13 flagged with the
+    # 1.7.2 detector. Must not get worse.
+    assert metrics.n_benign >= 200
+    assert metrics.benign_flagged <= 13

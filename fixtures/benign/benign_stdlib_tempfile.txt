@@ -1,0 +1,23 @@
+Temporary files.
+
+This module provides generic, low- and high-level interfaces for
+creating temporary files and directories.  All of the interfaces
+provided by this module can be used without fear of race conditions
+except for 'mktemp'.  'mktemp' is subject to race conditions and
+should not be used; it is provided for backward compatibility only.
+
+The default path names are returned as str.  If you supply bytes as
+input, all return values will be in bytes.  Ex:
+
+    >>> tempfile.mkstemp()
+    (4, '/tmp/tmptpu9nin8')
+    >>> tempfile.mkdtemp(suffix=b'')
+    b'/tmp/tmppbi8f0hy'
+
+This module also provides some data items to the user:
+
+  TMP_MAX  - maximum number of names that will be tried before
+             giving up.
+  tempdir  - If this is set to a string before the first use of
+             any routine from this module, it will be considered as
+             another candidate location to store temporary files.

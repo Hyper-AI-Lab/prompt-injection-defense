@@ -1,0 +1,11 @@
+From: billing@acme-supplies.example
+Subject: Invoice INV-2026-1187 (due 30 Nov)
+
+Dear customer,
+
+Please find attached invoice INV-2026-1187 for October deliveries (EUR 4,212.50).
+Payment details are unchanged: IBAN DE89 3704 0044 0532 0130 00, BIC COBADEFFXXX, reference INV-2026-1187.
+If you have any questions about the line items, contact accounts@acme-supplies.example.
+
+Kind regards,
+Acme Supplies Accounts Receivable

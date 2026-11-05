@@ -1,0 +1,2 @@
+@channel 明日のリリース、staging で QA OK でした 🎉 prod deploy は 10:00 JST から。
+Rollback 手順は runbook の "API rollback" を参照してください。何かあれば #incident へ。

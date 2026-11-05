@@ -1,0 +1,11 @@
+## Authentication
+
+All requests must include your API key in the `Authorization` header:
+
+    curl https://api.example.com/v1/messages \
+      -H "Authorization: Bearer $EXAMPLE_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"to": "+81...", "text": "hello"}'
+
+Keep your API key secret. Do not commit it to version control or paste it into issue trackers.
+If a key leaks, revoke it from the dashboard and create a new one.

@@ -1,0 +1,6 @@
+FAILED tests/test_api.py::test_create_order - AssertionError: expected 201, got 500
+E   requests.exceptions.ConnectionError: HTTPConnectionPool(host='localhost', port=5432): Max retries exceeded
+=========================== short test summary info ===========================
+FAILED tests/test_api.py::test_create_order
+1 failed, 212 passed in 41.27s
+Hint: start the database with `docker compose up -d db` and re-run the tests.

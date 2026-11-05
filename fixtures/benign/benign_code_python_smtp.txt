@@ -1,0 +1,15 @@
+import smtplib
+from email.message import EmailMessage
+
+def send_report(path: str, to: str) -> None:
+    msg = EmailMessage()
+    msg["Subject"] = "Nightly report"
+    msg["From"] = "reports@company.example"
+    msg["To"] = to
+    msg.set_content("Attached is the nightly report.")
+    with open(path, "rb") as fh:
+        msg.add_attachment(fh.read(), maintype="text", subtype="csv", filename="report.csv")
+    with smtplib.SMTP("smtp.company.example", 587) as s:
+        s.starttls()
+        s.login("reports", os.environ["SMTP_PASSWORD"])
+        s.send_message(msg)

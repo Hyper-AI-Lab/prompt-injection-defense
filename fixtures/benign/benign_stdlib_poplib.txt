@@ -1,0 +1,41 @@
+poplib.POP3: This class supports both the minimal and optional command sets.
+Arguments can be strings or integers (where appropriate)
+(e.g.: retr(1) and retr('1') both work equally well.
+
+Minimal Command Set:
+        USER name               user(name)
+        PASS string             pass_(string)
+        STAT                    stat()
+        LIST [msg]              list(msg = None)
+        RETR msg                retr(msg)
+        DELE msg                dele(msg)
+        NOOP                    noop()
+        RSET                    rset()
+        QUIT                    quit()
+
+Optional Commands (some servers support these):
+        RPOP name               rpop(name)
+        APOP name digest        apop(name, digest)
+        TOP msg n               top(msg, n)
+        UIDL [msg]              uidl(msg = None)
+        CAPA                    capa()
+        STLS                    stls()
+        UTF8                    utf8()
+
+Raises one exception: 'error_proto'.
+
+Instantiate with:
+        POP3(hostname, port=110)
+
+NB:     the POP protocol locks the mailbox from user
+        authorization until QUIT, so be sure to get in, suck
+        the messages, and quit, each time you access the
+        mailbox.
+
+        POP is a line-based protocol, which means large mail
+        messages consume lots of python cycles reading them
+        line-by-line.
+
+        If it's available on your mail server, use IMAP4
+        instead, it doesn't suffer from the two problems
+        above.

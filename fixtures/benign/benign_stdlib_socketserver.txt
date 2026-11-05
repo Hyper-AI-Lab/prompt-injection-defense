@@ -1,0 +1,48 @@
+Generic socket server classes.
+
+This module tries to capture the various aspects of defining a server:
+
+For socket-based servers:
+
+- address family:
+        - AF_INET{,6}: IP (Internet Protocol) sockets (default)
+        - AF_UNIX: Unix domain sockets
+        - others, e.g. AF_DECNET are conceivable (see <socket.h>
+- socket type:
+        - SOCK_STREAM (reliable stream, e.g. TCP)
+        - SOCK_DGRAM (datagrams, e.g. UDP)
+
+For request-based servers (including socket-based):
+
+- client address verification before further looking at the request
+        (This is actually a hook for any processing that needs to look
+         at the request before anything else, e.g. logging)
+- how to handle multiple requests:
+        - synchronous (one request is handled at a time)
+        - forking (each request is handled by a new process)
+        - threading (each request is handled by a new thread)
+
+The classes in this module favor the server type that is simplest to
+write: a synchronous TCP/IP server.  This is bad class design, but
+saves some typing.  (There's also the issue that a deep class hierarchy
+slows down method lookups.)
+
+There are five classes in an inheritance diagram, four of which represent
+synchronous servers of four types:
+
+        +------------+
+        | BaseServer |
+        +------------+
+              |
+              v
+        +-----------+        +------------------+
+        | TCPServer |------->| UnixStreamServer |
+        +-----------+        +------------------+
+              |
+              v
+        +-----------+        +--------------------+
+        | UDPServer |------->| UnixDatagramServer |
+        +-----------+        +--------------------+
+
+Note that UnixDatagramServer derives from UDPServer, not from
+UnixStreamServer -- the only difference between an IP and

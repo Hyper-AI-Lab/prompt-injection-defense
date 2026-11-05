@@ -1,0 +1,5 @@
+<html><body>
+<div style="display:none;max-height:0;overflow:hidden;">Black Friday starts now — up to 40% off all annual plans.</div>
+<table width="100%"><tr><td><h2>Black Friday</h2><p>Save up to 40% on annual plans until 30 November.</p>
+<p><a href="https://shop.example.com/bf">See offers</a></p></td></tr></table>
+</body></html>

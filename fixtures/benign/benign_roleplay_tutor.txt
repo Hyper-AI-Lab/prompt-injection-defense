@@ -1,0 +1,2 @@
+Act as a patient Spanish tutor. I'll write sentences and you correct my grammar, explaining each mistake briefly.
+Start with simple present tense. Here is my first sentence: "Yo tiene dos hermanos."

@@ -1,0 +1,3 @@
+Macro: refund-duplicate-charge
+Agents should first confirm the two charges in the billing console, then issue a refund for the later one and send
+the customer the "Refund issued" template. Do not refund charges older than 90 days without a team lead's approval.

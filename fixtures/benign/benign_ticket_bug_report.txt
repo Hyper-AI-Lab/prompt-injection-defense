@@ -1,0 +1,7 @@
+Title: Export to CSV drops rows with commas in the note field
+Steps to reproduce:
+1. Create a contact with note "Met at PyCon, follow up".
+2. Click Export > CSV.
+3. Open the file — the row is split into two columns.
+Expected: the note is quoted. Actual: unquoted comma breaks the row.
+Workaround: export as XLSX instead.

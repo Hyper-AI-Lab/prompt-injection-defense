@@ -1,0 +1,4 @@
+Title: Why does my cron job not see environment variables?
+I set API_TOKEN in ~/.bashrc and my script works in the terminal, but under cron it fails with 401.
+Answer: cron doesn't load your shell profile. Put the variables in the crontab itself or source a file at the
+top of the script, and make sure that file is readable only by your user (chmod 600).

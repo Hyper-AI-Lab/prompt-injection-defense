@@ -1,0 +1,9 @@
+Sending an email with the SDK
+
+```python
+from mailer import Client
+client = Client(api_key=os.environ["MAILER_API_KEY"])
+client.emails.send(to="customer@example.com", subject="Welcome", html="<p>Hi!</p>")
+```
+
+The `send` call returns a message id. You must call `client.close()` when your worker shuts down.
