@@ -2678,3 +2678,29 @@ techniques from the 2026-11 threat check; trust propagation; version 1.7.2. Appr
   DECISIONS entry; ARCHITECTURE / THREAT_MODEL / BOT_PLAYBOOK / AGENT_INSTALL updated
 
 ### Verdict: VERIFIED (pre-push)
+
+## Detector 1.7.2 — Steps 7–8 (post-push) — 2026-11-05 JST
+
+### Evidence
+- Release commit `d2d9180` — *Release containment 1.7.2 — detector coverage for the 2026-11
+  threat check*; push `21da2ef..d2d9180 main -> main`
+- CI on main (run 41960896858): **success** (ruff, pytest, release gate, wheel smoke,
+  pip-audit, SBOM)
+- `cut_release.sh 1.7.2` dry run exit 0; `--execute` exit 0: annotated tag `v1.7.2` →
+  `d2d9180`; publish run 41961205254 **success** (build success, publish skipped); wheel +
+  sdist attestations verified (tag + workflow bound); release created
+- https://github.com/Hyper-AI-Lab/prompt-injection-defense/releases/tag/v1.7.2 — not draft,
+  published 2026-11-05 12:23 JST; assets `containment-1.7.2-py3-none-any.whl`,
+  `containment-1.7.2.tar.gz`, `eval-card.json`, `eval-card.md`
+- Consumer path (fresh dir/venv): `gh release download` → `gh attestation verify
+  --source-ref refs/tags/v1.7.2` wheel + sdist OK → `pip install` wheel → `containment 1.7.2`;
+  `doctor --install-only` OK 2/2; shipped eval 64 / 47, ASR 0.0000, FPR 0.0213,
+  detector_block_rate 0.7812
+- PyPI: not published (G0 pending; no repo settings changed)
+
+### Residuals
+Shared skill `/home/box/agent-data/workflows/containment-untrusted-content/SKILL.md` and
+`/workspace/.venvs/containment` still pin `v1.7.1` (not in this plan's scope). Lexical rules
+miss paraphrased steering without these cues; policy remains the primary control.
+
+### Verdict: VERIFIED
