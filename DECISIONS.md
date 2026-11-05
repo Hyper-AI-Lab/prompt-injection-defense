@@ -450,3 +450,48 @@ with `--source-ref refs/tags/vX.Y.Z`.
 Rules are lexical: paraphrased steering without these cues still relies on policy (the
 primary control). Hidden-text detection covers inline `style` attributes, not stylesheet
 classes. Unchanged: PyPI off until G0; host-owned isolation / egress / WORM.
+
+## 2026-11-05 — Wording-independent detector (→ 1.8.0)
+
+### Audit verdict — detector was not implemented per the original plan
+The 2026-10-06/07 plan called for a cascade whose Stage 1 is a real classifier. In 1.7.2
+production was Stage-0 regex only: the default Stage 1 mirrored Stage 0, Stage 2 was a
+NoOp, PIGuard / Prompt Guard 2 / StackOne adapters had never been run with real weights,
+and the reported `detector_block_rate` was inflated by an eval-only hint regex. On a
+paraphrase/mutation eval the 1.7.2 detector caught 34.2 % of held-out variants.
+Details: `DETECTOR_1_8_0_PLAN.md` (audit), `docs/EVAL_CARD.md` (numbers).
+
+### Layered detector — **ADOPT**
+- Zero-dependency Stage 0 stays the default and keeps every 1.7.2 rule; adds structural
+  intent (multilingual categories + combinations, negation- and discussion-aware),
+  decode-and-rescan, computed CSS hiding with `<style>` rules, de-obfuscation views,
+  encoded invisibles, generalised package swap, chunk joins; presence-only encodings capped.
+- Optional local Stage 1: ONNX classifier + structural fusion; optional Stage-2 LLM judge
+  (interface; raises risk only). Both fail closed when configured but unusable.
+- Fusion thresholds and every rule change were tuned on the train split only
+  (`sha256(case_id) % 3 != 0`); the 18 holdout cases were not inspected for tuning.
+
+### Model choice — Horizon-Labs/prompt-injection-guard-small (default), -base (option)
+- https://huggingface.co/Horizon-Labs/prompt-injection-guard-small (revision
+  `9760ad5a613a…`, checked 2026-11-05): mmBERT-small fine-tune, Apache-2.0, ungated,
+  multilingual, trained on direct and indirect injections, ships an int8 ONNX (268 MB);
+  its tokenizer normalises full-width and zero-width obfuscation. Pinned by revision and
+  SHA-256 of `onnx/model_quantized.onnx` and `tokenizer.json`.
+- Measured on the mutation eval (classifier alone, raw text, train / holdout variant
+  recall, benign FP): hl-small @0.9 0.90 / 0.85, FP 1/161 / 1/61; hl-base @0.8 0.95 / 0.91,
+  FP 1/161 / 1/61 but ~2.2x slower and 641 MB; protectai deberta-v3-base v2 @0.5
+  0.90 / 0.86 with FP 46/161 / 13/61 (English-only, archived). In the fused production path
+  hl-small and hl-base land at 97.9 % / 97.4 % held-out recall, so the smaller, faster model
+  is the default and hl-base is a registry option (`onnx:hl-base`).
+- Rejected: Meta Prompt Guard 2 (gated, manual approval; no token on the box), Sentinel v2
+  (gated, non-standard licence), flowxai/injection (48 downloads, 96-token max length),
+  PIGuard as default (needs `trust_remote_code` + torch; kept as legacy `[piguard]`).
+- CPU latency: hl-small ~90 ms for 1 KB, ~145–155 ms/KB above (4 threads, loaded box).
+
+### Accepted residuals
+No detector catches every injection; containment (labels → policy → broker) is the
+guarantee. Held-out misses: goal-decomposition diagnostics, MCP tool-description
+log-to-leak (zero-dep), terse policy-tampering paraphrases (zero-dep). Quoted injections
+inside attack-discussion text are treated as mentions. The ONNX layer reads the first 64
+token windows (~100 KB); Stage 0 reads up to the 256 KB size limit. Zero-dep Stage 0 is
+~5–10x slower than 1.7.2 (11–23 ms/KB).

@@ -35,9 +35,16 @@ untrusted bytes
 | `capability` | one-use HMAC capability tokens |
 | `audit` | append-only JSONL |
 | `broker` | reference monitor `secure_execute` |
-| `detectors.rules` | Stage0 Unicode / invisible / base64 / hex / Morse / size; steering directives (tool-call, secret exfil, package swap, role tags, approval claims, error fallbacks, refusal bans) and CSS-hidden HTML text |
-| `detectors.cascade` | Stage0→1→2 aggregation; never authorizes |
-| `detectors.piguard` | optional HF PIGuard; Fake/RulesOnly for CI |
+| `detectors.rules` | Stage0 Unicode / invisible / encodings / Morse / size; steering directives (tool-call, secret exfil, package swap, role tags, approval claims, error fallbacks, refusal bans, override phrases); structural intent; rescans decoded / de-obfuscated / CSS-hidden *views* (`encoded_instruction`, `obfuscated_instruction`, `hidden_instruction`) |
+| `detectors.structural` | multilingual (EN/RU/JA + common EU) intent categories and combinations, negation- and discussion-aware |
+| `detectors.decode` | discovery-only decoding (base64, hex, percent, ROT13, Morse, nested) + confusable folding |
+| `detectors.html_hidden` | computed CSS hiding: `<style>` rules (tag/.class/#id), inline style, `hidden`, inheritance |
+| `detectors.onnx_classifier` | optional pinned + SHA-256-verified ONNX classifier (`[ml]`), windowed; `UnavailableStage1` fails closed |
+| `detectors.layered` | Stage-1 fusion of classifier probability with structural cues (thresholds tuned on train split) |
+| `detectors.llm_judge` | optional Stage-2 OpenAI-compatible judge; raises risk only; fails closed |
+| `detectors.cascade` | Stage0→1→2 aggregation, `scan_chunks` (chunks + adjacent joins); never authorizes |
+| `detectors.piguard` | Stage-1 selection (`rules_only`, `onnx[:model]`, legacy PIGuard, fake for CI) |
+| `mutation_eval` | detector-only paraphrase/mutation eval with a frozen train/holdout split |
 | `quarantine` | tool-less typed extract; closed schema |
 | `datamark` | random marker wrap/unwrap |
 | `ingest` | wires label → cascade → quarantine |

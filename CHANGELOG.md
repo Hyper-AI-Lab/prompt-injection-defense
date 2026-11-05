@@ -9,6 +9,49 @@ They are not a benchmark claim; see `docs/EVAL_CARD.md` for scope.
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-11-05
+
+The detector now aims to catch prompt injection regardless of wording. **No detector
+catches every injection**; policy and capability containment remain the guarantee
+(`docs/THREAT_MODEL.md`).
+
+### Added
+- Detector-only paraphrase/mutation eval: `containment eval --suite mutations` — 64 attacks
+  × 14 families (hand-written reword / indirect / Russian / Japanese paraphrases, synonym,
+  split across chunks, base64, hex, percent-escape, ROT13, markdown, HTML comment, CSS class
+  hiding), frozen train/holdout split (`fixtures/mutations/SPLIT.md`).
+- Benign corpus 47 → 222 files (multilingual, HTML with real stylesheets, code, logs,
+  CPython docstrings; provenance in `fixtures/benign/SOURCES.md`).
+- Stage 0 (zero-dependency): multilingual structural intent (`injection_intent`),
+  `override_phrase`, decode-and-rescan (`encoded_instruction`; base64, hex, percent, ROT13
+  without a marker, Morse, nested), computed CSS hiding with `<style>` classes/ids and
+  inheritance (`hidden_instruction`), invisible/homoglyph de-obfuscation
+  (`obfuscated_instruction`), `encoded_invisible`; package swap for any phrasing.
+- `DetectorCascade.scan_chunks` (chunks, adjacent pairs, whole document);
+  `CascadeResult.high_risk`; `Stage0Result.views`.
+- Optional ONNX Stage 1: `CONTAINMENT_STAGE1=onnx[:hl-small|hl-base]`, `LayeredDetector`
+  fusion, `containment models list|fetch|verify` (pinned revision + SHA-256), fails closed.
+- Optional Stage-2 LLM judge: `CONTAINMENT_STAGE2=llm` (OpenAI-compatible, raises risk only,
+  fails closed).
+- `containment doctor`: `stage1.model` check when the ONNX layer is configured.
+- CI `ml-eval` job; wheel smoke runs the mutation suite.
+
+### Changed
+- `[ml]` extra is now `onnxruntime` + `tokenizers` + `numpy`; PIGuard moved to `[piguard]`.
+- Presence-only `base64_blob` / `hex_run` / `percent_encoding` weigh 0.15 each, capped at
+  0.3 together (hashes, JWTs and images no longer flag); inline-only CSS rule replaced by the
+  computed one (`css_hidden_text` alone weighs 0.2).
+- `eval_runner` no longer adds the eval-only instruction-hint regex: `detector_block_rate`
+  is now the production cascade's verdict.
+- Held-out paraphrase recall (detector only): 34.2 % → 90.2 % zero-dep, 97.9 % with ONNX
+  hl-small. Benign flagged: 8/222 → 6/222 zero-dep, 8/222 with ONNX.
+- Eval on `fixtures` (policy ON): 64 attacks / 222 benign; ASR 0.0000; detector block rate
+  1.0000; FPR 6/222 = 0.0270 (1.7.2 on the same corpus: 13/222 with the hint).
+- Zero-dep latency 11–23 ms/KB (was ~2 ms/KB); ONNX layer ~150 ms/KB on CPU.
+
+### Security
+- A configured model or judge that cannot be used fails closed instead of falling back.
+
 ## [1.7.2] - 2026-11-05
 
 ### Added
@@ -168,7 +211,8 @@ They are not a benchmark claim; see `docs/EVAL_CARD.md` for scope.
 - First release: trust labels, default-deny policy broker, ingest/quarantine,
   detector cascade, Moltbook read-only helper, offline eval CLI, agent install skill.
 
-[Unreleased]: https://github.com/Hyper-AI-Lab/prompt-injection-defense/compare/v1.7.2...HEAD
+[Unreleased]: https://github.com/Hyper-AI-Lab/prompt-injection-defense/compare/v1.8.0...HEAD
+[1.8.0]: https://github.com/Hyper-AI-Lab/prompt-injection-defense/compare/v1.7.2...v1.8.0
 [1.7.2]: https://github.com/Hyper-AI-Lab/prompt-injection-defense/compare/v1.7.1...v1.7.2
 [1.7.1]: https://github.com/Hyper-AI-Lab/prompt-injection-defense/compare/v1.7.0...v1.7.1
 [1.7.0]: https://github.com/Hyper-AI-Lab/prompt-injection-defense/compare/v1.6.1...v1.7.0

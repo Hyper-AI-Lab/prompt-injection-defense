@@ -53,7 +53,7 @@ Python 3.12+. Distribution name `containment`; releases are published on
 (wheel + sdist with artifact attestations). It is **not** on PyPI.
 
 ```bash
-pip install "git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.7.2"
+pip install "git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.8.0"
 containment doctor --install-only
 ```
 
@@ -70,19 +70,32 @@ pip install -e ".[dev]"
 pytest -q
 ```
 
-Optional ML Stage-1 weights:
+### Detector modes
+
+The detector is built to be wording-independent: rules plus multilingual structural intent
+(EN/RU/JA and more), decode-and-rescan of base64 / hex / percent / ROT13 / Morse, computed
+CSS hiding (including `<style>` classes), invisible-character and homoglyph de-obfuscation,
+and chunk joins. **No detector catches every injection**; policy and capability containment
+are the guarantee ([docs/THREAT_MODEL.md](docs/THREAT_MODEL.md)).
+
+- **Zero-dependency (default):** held-out paraphrase recall 90.2 %, 6/222 benign flagged,
+  ~11–23 ms/KB.
+- **ONNX layer (optional, CPU, local):** a pinned, hash-verified multilingual classifier fused
+  with the structural cues; held-out recall 97.9 %, 8/222 benign flagged, ~150 ms/KB.
+  A configured model that cannot load **fails closed**.
 
 ```bash
-pip install -e ".[dev,ml]"
+pip install -e ".[dev,ml]"          # onnxruntime + tokenizers + numpy (no torch)
+containment models fetch            # hl-small, pinned revision, SHA-256 verified
+export CONTAINMENT_STAGE1=onnx      # or onnx:hl-base
+containment eval --suite mutations  # detector-only paraphrase eval, train/holdout
 ```
 
-### Enable PIGuard (optional)
-
-Default `ingest()` stays **RulesOnly** (fail-closed metadata) until the host wires
-PIGuard and passes cascade / `fail_closed_privileged` into the broker. Recipe and
-host residual checklist: [docs/AGENT_INSTALL.md](docs/AGENT_INSTALL.md) §7–§8.
-Short path: `CONTAINMENT_STAGE1=piguard` + `CONTAINMENT_PIGUARD_ALLOW_DOWNLOAD=1`,
-or `make_stage1_cascade(prefer="piguard", allow_download=True)`.
+Optional LLM judge (Stage 2, any OpenAI-compatible endpoint; raises risk only, fails
+closed): `CONTAINMENT_STAGE2=llm`, `CONTAINMENT_JUDGE_URL`, `CONTAINMENT_JUDGE_MODEL`,
+`CONTAINMENT_JUDGE_API_KEY`. Legacy PIGuard: `[piguard]` extra,
+`CONTAINMENT_STAGE1=piguard`. Recipe and host residual checklist:
+[docs/AGENT_INSTALL.md](docs/AGENT_INSTALL.md) §7–§8.
 
 OWASP LLM Top 10 control map: [docs/OWASP_LLM_TOP10_MAP.md](docs/OWASP_LLM_TOP10_MAP.md).
 

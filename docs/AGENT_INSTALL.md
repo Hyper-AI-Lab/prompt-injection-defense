@@ -9,7 +9,7 @@ For Grok bots and other Python agents that must read untrusted content
 Pinned release (GitHub Releases; not on PyPI):
 
 ```bash
-pip install "git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.7.2"
+pip install "git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.8.0"
 containment doctor --install-only
 ```
 
@@ -114,25 +114,32 @@ If the decision is `deny`, stop. If `require_human`, obtain exact approval
 
 Follow [SKILL.md](../SKILL.md) for the condensed bot procedure.
 
-## 7. Optional PIGuard Stage-1 (`CONTAINMENT_STAGE1`)
+## 7. Optional detector layers (`CONTAINMENT_STAGE1`, `CONTAINMENT_STAGE2`)
 
-Default `ingest()` uses **RulesOnly** (offline, fail-closed metadata). To enable
-optional PIGuard:
+Default `ingest()` uses the zero-dependency detector (Stage 0 rules, structural intent,
+decoding, CSS hiding, de-obfuscation; Stage 1 mirrors it, fail-closed metadata). To add the
+local ONNX classifier (CPU, no torch, no remote code):
 
 ```bash
-pip install -e ".[dev,ml]"   # or: pip install "containment[ml] @ git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.7.2"
-# First enable needs network *or* a pre-seeded Hugging Face cache.
-export CONTAINMENT_STAGE1=piguard
-export CONTAINMENT_PIGUARD_ALLOW_DOWNLOAD=1   # required to call try_load
+pip install -e ".[dev,ml]"   # or: pip install "containment[ml] @ git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.8.0"
+containment models fetch     # default hl-small (268 MB); `containment models list` shows all
+export CONTAINMENT_STAGE1=onnx          # or onnx:hl-base (641 MB, ~2x slower)
+containment doctor --install-only       # stage1.model must PASS
 ```
 
-Or wire explicitly (recommended for production hosts):
+Models live in `$CONTAINMENT_MODEL_DIR` (default `~/.cache/containment/models`). Every load
+re-checks the pinned SHA-256 and runs a self-test. If the model was asked for and cannot be
+used, Stage 1 returns `error` for every input (high risk; privileged sinks fail closed) —
+there is no silent fallback.
+
+Or wire explicitly:
 
 ```python
-from containment import ingest, make_stage1_cascade
-from containment.actions import ProposedAction
+from containment import ingest
+from containment.detectors import DetectorCascade, select_stage1
 
-casc, sel = make_stage1_cascade(prefer="piguard", allow_download=True)
+sel = select_stage1(prefer="onnx", model="hl-small")
+casc = DetectorCascade(stage1=sel.detector)
 result = ingest(raw, source=..., task_id=..., candidate=..., cascade=casc)
 # Detectors advise only — always pass cascade + fail-closed into the broker:
 broker.secure_execute(
@@ -143,18 +150,22 @@ broker.secure_execute(
 )
 ```
 
+Optional Stage-2 LLM judge (OpenAI-compatible `/chat/completions`):
+`CONTAINMENT_STAGE2=llm`, `CONTAINMENT_JUDGE_URL` (e.g. `http://127.0.0.1:8000/v1`),
+`CONTAINMENT_JUDGE_MODEL`, optional `CONTAINMENT_JUDGE_API_KEY` / `_TIMEOUT_S`. It sees the
+untrusted text, can only raise risk, and fails closed when misconfigured or unreachable.
+
 Notes:
 
-- `allow_download=True` is required to attempt PIGuard load (HF may still use a
-  local cache and not re-download). Cached weights alone do **not** enable
-  PIGuard when `allow_download=False`.
-- PIGuard-on does **not** replace policy/broker; detectors never authorize.
-- Env vars: `CONTAINMENT_STAGE1=rules_only|piguard|fake` and
-  `CONTAINMENT_PIGUARD_ALLOW_DOWNLOAD=0|1` (see also `CONTAINMENT_LIVE_MOLTBOOK`).
+- No detector catches every injection; detectors never authorize. Policy/broker are the
+  guarantee.
+- Env vars: `CONTAINMENT_STAGE1=rules_only|onnx[:model]|piguard|fake`,
+  `CONTAINMENT_PIGUARD_ALLOW_DOWNLOAD=0|1` (legacy PIGuard via the `[piguard]` extra, needs
+  `trust_remote_code`), `CONTAINMENT_STAGE2=llm` (see also `CONTAINMENT_LIVE_MOLTBOOK`).
 
 ## 8. Host must still provide (residual checklist)
 
-This library is not a sandbox. Independently of PIGuard-on, hosts **must** still
+This library is not a sandbox. Independently of the detector mode, hosts **must** still
 declare and wire controls. Full recipe: [HOST_HARDENING.md](HOST_HARDENING.md).
 
 1. **OS / container process isolation** — package code runs in-process with the
@@ -166,8 +177,8 @@ declare and wire controls. Full recipe: [HOST_HARDENING.md](HOST_HARDENING.md).
    adapter). Never commit HMAC/Ed25519 material. Enterprise host gate requires it.
 4. **AuditShipper** — export JSONL (`FileAuditShipper`); external WORM/SIEM
    remains host-owned (hash chain is tamper-evidence, not WORM).
-5. **Supply-chain review** of Hugging Face `trust_remote_code=True` before
-   turning PIGuard on.
+5. **Supply-chain review** of model files: the ONNX models are pinned by revision and
+   SHA-256; legacy PIGuard needs Hugging Face `trust_remote_code=True` — review first.
 6. **RateLimitGate** — optional broker spend cap; also cap model/tool APIs
    outside the library (LLM10 residual).
 

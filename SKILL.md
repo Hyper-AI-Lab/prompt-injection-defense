@@ -22,7 +22,7 @@ Pin a release tag (GitHub Releases; not on PyPI). Full procedure with attestatio
 verify: `docs/BOT_PLAYBOOK.md` §1.
 
 ```bash
-pip install "git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.7.2"
+pip install "git+https://github.com/Hyper-AI-Lab/prompt-injection-defense.git@v1.8.0"
 containment doctor --install-only        # exit 0 = package data + policy OK
 ```
 
@@ -36,8 +36,10 @@ pytest -q
 python -m containment.cli eval --suite fixtures
 ```
 
-Default Stage-1 is **RulesOnly**. Optional PIGuard: `pip install -e ".[dev,ml]"` then
-follow `docs/AGENT_INSTALL.md` (§7 `CONTAINMENT_STAGE1` / `make_stage1_cascade`).
+Default detector is zero-dependency (rules + structural intent + decoding + CSS hiding).
+Optional ONNX layer: `pip install -e ".[dev,ml]"`, `containment models fetch`,
+`CONTAINMENT_STAGE1=onnx` (fails closed if unusable); see `docs/AGENT_INSTALL.md` §7.
+No detector catches every injection; policy/broker containment is the guarantee.
 Host sandbox, egress proxy, and secret vaults remain **required**
 (`docs/AGENT_INSTALL.md` §8; `docs/HOST_HARDENING.md`). Prefer
 `build_enterprise_host()` so HostGate + signed intents + `EgressProvider` are on. Pin egress with

@@ -33,10 +33,15 @@ is influenced by injected instructions.
 
 1. **Labels** — every value carries integrity/confidentiality/provenance.
 2. **Ingest pipeline** — label → normalize → detector cascade → quarantine typed extract.
-3. **Detector cascade** — Stage0 rules → Stage1 adapter → optional Stage2; **never authorizes**.
+3. **Detector cascade** — Stage0 rules (zero-dependency: rules, multilingual structural
+   intent, decode-and-rescan, computed CSS hiding, de-obfuscation views) → Stage1 (rules
+   mirror, or the optional local ONNX classifier fused with structural cues) → optional
+   Stage2 LLM judge; **never authorizes**.
 4. **Policy engine** — YAML default-deny; taint predicates block untrusted → privileged egress.
 5. **Tool broker** — unknown tools denied; schema check; capability mint one-use; audit append.
-6. **Fail closed** — detector error / missing Stage-1 weights advise deny for privileged sinks.
+6. **Fail closed** — detector error, a configured-but-unusable model (`CONTAINMENT_STAGE1=onnx`)
+   or an unreachable judge (`CONTAINMENT_STAGE2=llm`) yields `error` → high risk; privileged
+   sinks deny.
 7. **Datamarking** — optional spotlighting helpers for trusted instructions vs untrusted data.
 8. **Signed intents (HMAC / optional Ed25519)** — enterprise: verify `IntentEnvelope`
    authenticity + expiry + `plan_hash` before capability mint
@@ -52,15 +57,39 @@ is influenced by injected instructions.
     `docs/HOST_HARDENING.md`.
 12. **RateLimitGate** — optional token-bucket on privileged broker mint (LLM10).
 
+## Detection is best effort; containment is the guarantee
+
+**No detector catches every prompt injection, and this one does not either.** Natural
+language has unbounded ways to phrase an instruction; attackers can adapt to any fixed
+detector (rules, classifier or LLM judge). The detector cascade is built to be
+wording-independent and to catch as much as it can — on the held-out paraphrase eval it
+flags 90.2 % of variants with no dependencies and 97.9 % with the ONNX layer (see
+`docs/EVAL_CARD.md`) — but the remaining misses are real, and so are false positives.
+
+The guarantee comes from **policy and capability containment**: untrusted content is
+labeled untrusted, the model only *proposes* actions, and the broker denies privileged
+tools (email, HTTP, wallet, shell, ...) for tainted plans unless policy and, where required,
+a human allow them. A missed injection can still influence text the model writes; it cannot
+by itself authorize a privileged action.
+
 ## Non-goals / residual risk
 
 - No claim of immunity to adaptive or novel attacks.
 - Detectors can miss (false negatives) or over-flag (false positives); policy is the authority boundary.
+- Known detector blind spots (1.8.0 held-out eval): multi-step "diagnostic" instructions where
+  each step looks harmless (goal decomposition); MCP tool descriptions asking to log/forward
+  data (zero-dep mode); terse policy-tampering paraphrases ("erase the default_deny policy")
+  in zero-dep mode; injections quoted inside text that also discusses attacks (the quote
+  dampener treats them as mentions); text beyond ~100 KB is scored by Stage 0 only (the ONNX
+  layer reads the first 64 token windows); the LLM judge itself reads untrusted text and can
+  be steered (it can only raise risk).
 - Does not replace OS process isolation. In-package interfaces cover vault-shaped
   secrets (`SecretProvider`), audit export (`AuditShipper`), rate gates, and an
   optional resolve-pin forward proxy; residual remains if the host skips
   checklist / proxy / real isolation (see `docs/HOST_HARDENING.md`).
-- Optional HF weights (PIGuard / Prompt Guard 2) may be unavailable; offline mode uses rules + fail-closed privileged path.
+- Optional model weights (ONNX hl-small/hl-base; legacy PIGuard / Prompt Guard 2) may be
+  unavailable; zero-dependency mode uses Stage 0 + fail-closed privileged path, and a model
+  that was configured but cannot load fails closed.
 - Live third-party APIs (Moltbook) remain untrusted even when “verified” by the host site.
 - **Audit trail integrity residual (L3):** `AuditLog` is an append-only JSONL file with a
   best-effort per-event hash chain (`prev_hash` / `event_hash`). Anyone with filesystem

@@ -118,8 +118,8 @@ def test_playbook_names_the_code_it_documents() -> None:
         "containment doctor --install-only",
         "containment-reference-host --scenario all",
         "containment-eval-card --suite fixtures",
-        "gh attestation verify containment-1.7.2-py3-none-any.whl",
-        "--source-ref refs/tags/v1.7.2",
+        "gh attestation verify containment-1.8.0-py3-none-any.whl",
+        "--source-ref refs/tags/v1.8.0",
     ):
         assert needle in text, needle
 
