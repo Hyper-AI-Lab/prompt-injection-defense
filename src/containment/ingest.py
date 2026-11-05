@@ -49,12 +49,19 @@ def default_ingest_cascade() -> DetectorCascade:
     """Production offline cascade: Stage0 + RulesOnly (fail_closed metadata).
 
     FakeStage1Detector is for tests/eval helpers only — not this default.
-    When ``CONTAINMENT_STAGE1`` is set, honor ``stage1_from_env()``; otherwise
-    RulesOnly. For explicit PIGuard wiring prefer ``make_stage1_cascade``.
+    When ``CONTAINMENT_STAGE1`` is set, honor ``stage1_from_env()`` (``onnx[:model]``
+    fails closed if the model is unusable); otherwise RulesOnly. ``CONTAINMENT_STAGE2=llm``
+    adds the optional LLM judge (fails closed if misconfigured or unreachable).
+    For explicit PIGuard wiring prefer ``make_stage1_cascade``.
     """
+    from containment.detectors.llm_judge import stage2_from_env
+
     env_sel = stage1_from_env()
     selection = env_sel if env_sel is not None else select_stage1(prefer="rules_only")
-    return DetectorCascade(stage1=selection.detector)
+    judge = stage2_from_env()
+    return DetectorCascade(
+        stage1=selection.detector, stage2=judge, run_stage2=judge is not None
+    )
 
 
 def ingest(

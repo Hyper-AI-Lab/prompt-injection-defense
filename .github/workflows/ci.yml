@@ -49,6 +49,7 @@ jobs:
           "$RUNNER_TEMP/wheel-venv/bin/pip" install "$RUNNER_TEMP"/dist/*.whl
           cd "$RUNNER_TEMP"
           wheel-venv/bin/containment eval --suite fixtures
+          wheel-venv/bin/containment eval --suite mutations
           wheel-venv/bin/containment-eval-card --suite fixtures --out-dir eval-card
           wheel-venv/bin/containment-reference-host --scenario all
 
@@ -65,3 +66,39 @@ jobs:
           name: sbom-cdx-json
           path: sbom.cdx.json
           if-no-files-found: error
+
+  # Optional ML layer: pinned ONNX classifier (hash-verified), mutation eval + tests.
+  ml-eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install package with the [ml] extra
+        run: |
+          python -m pip install -U pip
+          python -m pip install -e ".[dev,ml]"
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/containment/models
+          key: containment-models-${{ hashFiles('src/containment/detectors/onnx_classifier.py') }}
+
+      - name: Fetch and verify the default model (pinned revision + SHA-256)
+        run: containment models fetch hl-small
+
+      - name: Doctor with the ONNX Stage-1 configured
+        env:
+          CONTAINMENT_STAGE1: onnx
+        run: containment doctor --install-only
+
+      - name: Mutation eval (ONNX layered Stage-1)
+        env:
+          CONTAINMENT_STAGE1: onnx
+        run: containment eval --suite mutations
+
+      - name: Detector-layer tests incl. the real model
+        run: pytest -q tests/test_detector_layers.py tests/test_mutation_eval.py

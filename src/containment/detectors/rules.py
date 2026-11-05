@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import base64
 import bisect
+import functools
 import hashlib
 import re
 import unicodedata
@@ -12,6 +13,10 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any
+
+from containment.detectors.decode import confusable_view, decoded_views
+from containment.detectors.html_hidden import hidden_html_text
+from containment.detectors.structural import intent_hits, strip_quoted_mentions
 
 # Zero-width / bidi / soft-hyphen / BOM-ish invisibles commonly used to hide text.
 _INVISIBLE_CODEPOINTS: frozenset[str] = frozenset(
@@ -54,6 +59,7 @@ _BASE64_BLOB_RE = re.compile(
 )
 
 # Long hex runs (discovery only — never decode-execute).
+_HEX_ONLY_RE = re.compile(r"[0-9A-Fa-f]+")
 _HEX_RUN_RE = re.compile(r"(?<![0-9A-Fa-f])(?:[0-9A-Fa-f]{24,})(?![0-9A-Fa-f])")
 
 # Percent-encoding sequences (URL escape discovery).
@@ -187,22 +193,32 @@ _REFUSAL_SUPPRESSION_RE = re.compile(
     r"(?:are|is)\s+invalid\b"
 )
 
-# Inline-styled HTML elements (bounded) and the CSS that hides their text.
-_STYLED_ELEMENT_RE = re.compile(
-    r"(?is)<([a-z][a-z0-9]{0,15})\b[^<>]{0,500}?\bstyle\s*=\s*([\"'])([^\"'<>]{0,1000})\2"
-    r"[^<>]{0,500}>(.{0,4000}?)</\1\s*>"
-)
-_HIDING_CSS_RE = re.compile(
-    r"display:none|visibility:hidden|font-size:0(?:\.0+)?(?:px|pt|em|rem|%)?(?:;|$)"
-    r"|opacity:0(?:\.0+)?(?:;|$)|(?:max-)?height:0(?:px)?;.*overflow:hidden"
-    r"|overflow:hidden;.*(?:max-)?height:0(?:px)?(?:;|$)"
-    r"|(?:left|top|text-indent|margin-left):-\d{3,}(?:px|em)"
-)
-_WHITE_TEXT_RE = re.compile(r"(?:^|;)color:(?:#fff(?:fff)?|white|rgb\(255,255,255\))(?:;|$)")
-_HTML_TAG_RE = re.compile(r"<[^>]+>")
-_HIDDEN_TEXT_MIN_WORDS = 4
-
 _DEFAULT_MAX_BYTES = 256_000
+
+# Classic override phrases (formerly an eval-only hint; now a production rule).
+_OVERRIDE_PHRASE_RE = re.compile(
+    r"(?is)\b("
+    r"ignore\s+(all\s+)?(previous|prior|above)\s+instructions?"
+    r"|you\s+are\s+now\b"
+    r"|do\s+not\s+follow\s+your\s+(previous|prior)\b"
+    r"|disregard\s+(all\s+)?(previous|prior)\b"
+    r"|override\s+(all\s+)?(safety|rules?|instructions?)"
+    r"|exfiltrate"
+    r")\b"
+)
+
+# Package names a document asks the agent to install or import, and swap phrasing.
+_PACKAGE_REF_RE = re.compile(
+    r"(?i)`([a-z][\w.-]{2,60})`"
+    r"|\b(?:pip3?|uv\s+pip|poetry|npm|pnpm|yarn|gem|cargo)\s+(?:install|add)\s+"
+    r"(?:-[-\w]+\s+)*([a-z][\w.-]{2,60})"
+    r"|\bimport\s+([a-z]\w{2,60})|\bfrom\s+([a-z]\w{2,60})\s+import\b"
+    r"|\brequire\(['\"]([a-z][\w.-]{2,60})['\"]\)"
+)
+_SWAP_PHRASE_RE = re.compile(
+    r"(?i)\binstead\s+of\b|\brather\s+than\b|\bin\s+place\s+of\b|\breplac\w+\b"
+    r"|\bnot\s+`|\bвместо\b|\bзамен\w*|の代わりに|ではなく|に置き換え"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -238,6 +254,8 @@ class Stage0Result:
     findings: tuple[Finding, ...]
     exceeded_size_limit: bool
     risk_score: float
+    # Decoded / de-obfuscated / CSS-hidden readings of the text, for later stages.
+    views: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not isinstance(self.findings, tuple):
@@ -267,8 +285,8 @@ def _looks_like_base64_payload(blob: str) -> bool:
         raw = base64.b64decode(padded, validate=False)
     except Exception:
         return False
-    if len(raw) < 8:
-        return False
+    if len(raw) < 8 or _HEX_ONLY_RE.fullmatch(blob):
+        return False  # hex digests are reported as hex_run, not base64
     # Reject pure-ASCII short words that accidentally match the alphabet.
     try:
         decoded = raw.decode("utf-8")
@@ -280,9 +298,9 @@ def _looks_like_base64_payload(blob: str) -> bool:
     return len(decoded.split()) >= 2 or len(raw) >= 24
 
 
-def _morse_findings(text: str) -> list[Finding]:
-    """Decode whitespace-separated Morse runs ('/' = word gap); report word-like ones."""
-    findings: list[Finding] = []
+def _morse_runs(text: str) -> list[tuple[int, str]]:
+    """Decode whitespace-separated Morse runs ('/' = word gap); keep word-like ones."""
+    out: list[tuple[int, str]] = []
     run: list[str] = []
 
     def flush() -> None:
@@ -294,13 +312,7 @@ def _morse_findings(text: str) -> list[Finding]:
         decoded = "".join(" " if tok == "/" else _MORSE_TABLE[tok] for tok in run).strip()
         words = [w for w in decoded.split() if any(c.isalpha() for c in w)]
         if len(words) >= 2:
-            findings.append(
-                Finding(
-                    kind="morse_run",
-                    message="Morse-code run discovered",
-                    detail={"symbols": len(letters), "decoded_preview": decoded[:64]},
-                )
-            )
+            out.append((len(letters), decoded))
 
     for token in text.split():
         if token == "/" or token in _MORSE_TABLE:
@@ -309,7 +321,22 @@ def _morse_findings(text: str) -> list[Finding]:
         flush()
         run = []
     flush()
-    return findings
+    return out
+
+
+def _morse_texts(text: str) -> list[str]:
+    return [decoded for _, decoded in _morse_runs(text)]
+
+
+def _morse_findings(text: str) -> list[Finding]:
+    return [
+        Finding(
+            kind="morse_run",
+            message="Morse-code run discovered",
+            detail={"symbols": symbols, "decoded_preview": decoded[:64]},
+        )
+        for symbols, decoded in _morse_runs(text)
+    ]
 
 
 def _edit_distance(a: str, b: str) -> int:
@@ -327,23 +354,12 @@ def _lookalike_packages(substitute: str, original: str) -> bool:
     a, b = substitute.lower(), original.lower()
     if a == b or min(len(a), len(b)) < 4:
         return False
+    longer, shorter = (a, b) if len(a) > len(b) else (b, a)
+    if len(longer) == len(shorter) + 1 and longer[-1] == longer[-2] and longer[:-1] == shorter:
+        return True  # doubled last letter: pyyamll / pyyaml
     if a.startswith(b) or a.endswith(b) or b.startswith(a) or b.endswith(a):
         return False
     return _edit_distance(a, b) <= 2
-
-
-def _hidden_html_text(text: str) -> list[str]:
-    """Visible-word text of inline-styled elements whose CSS hides them."""
-    hidden: list[str] = []
-    for match in _STYLED_ELEMENT_RE.finditer(text):
-        style = re.sub(r"\s+", "", match.group(3).lower())
-        is_white = _WHITE_TEXT_RE.search(style) and "background" not in style
-        if not (_HIDING_CSS_RE.search(style) or is_white):
-            continue
-        inner = " ".join(_HTML_TAG_RE.sub(" ", match.group(4)).split())
-        if len(re.findall(r"[^\W\d_]{2,}", inner)) >= _HIDDEN_TEXT_MIN_WORDS:
-            hidden.append(inner)
-    return hidden
 
 
 def _starts(pattern: re.Pattern[str], text: str) -> list[int]:
@@ -421,10 +437,21 @@ def _regex_rule(pattern: re.Pattern[str]) -> Callable[[str], str | None]:
 
 
 def _package_swap(text: str) -> str | None:
+    """A look-alike of a referenced package is installed/imported with swap phrasing."""
     for construct in (_USE_INSTEAD_RE, _IMPORT_AS_RE):
         for match in construct.finditer(text):
             if _lookalike_packages(match.group(1), match.group(2)):
                 return match.group(0)
+    swap = _SWAP_PHRASE_RE.search(text)
+    if swap is None:
+        return None
+    names = sorted(
+        {next(g for g in m.groups() if g).lower() for m in _PACKAGE_REF_RE.finditer(text)}
+    )[:64]
+    for i, a in enumerate(names):
+        for b in names[i + 1 :]:
+            if _lookalike_packages(a, b):
+                return f"{a} / {b} ({swap.group(0)})"
     return None
 
 
@@ -446,25 +473,70 @@ _DIRECTIVE_RULES: tuple[tuple[str, Callable[[str], str | None], str], ...] = (
      "instruction addressed to the AI agent"),
     ("refusal_suppression", _regex_rule(_REFUSAL_SUPPRESSION_RE),
      "ban on refusals, warnings or disclaimers"),
+    ("override_phrase", _regex_rule(_OVERRIDE_PHRASE_RE),
+     "classic instruction-override phrase"),
 )
 
 
 def _directive_findings(text: str) -> list[Finding]:
     """Steering cues in untrusted text. ``text`` is NFKC with invisibles removed."""
     findings: list[Finding] = []
+    text = strip_quoted_mentions(text)
     for kind, rule, message in _DIRECTIVE_RULES:
         evidence = rule(text)
         if evidence is not None:
             findings.append(Finding(kind=kind, message=message, detail={"preview": evidence[:96]}))
-    for inner in _hidden_html_text(text):
+    for hit in intent_hits(text):
         findings.append(
             Finding(
-                kind="css_hidden_text",
-                message="HTML text hidden by CSS",
-                detail={"preview": inner[:96]},
+                kind="injection_intent",
+                message=f"instruction intent: {hit.rule}",
+                detail={"rule": hit.rule, "preview": hit.preview[:96]},
             )
         )
     return findings
+
+
+# Findings that mean "this text carries an instruction" (not mere presence of encodings).
+_INSTRUCTION_KINDS = frozenset(kind for kind, _, _ in _DIRECTIVE_RULES) | {"injection_intent"}
+
+# Extra views: where they came from -> finding kind raised when a view carries an instruction.
+_VIEW_KINDS = {
+    "decoded": ("encoded_instruction", "instruction inside an encoded payload"),
+    "hidden_html": ("hidden_instruction", "instruction inside CSS-hidden HTML text"),
+    "deobfuscated": ("obfuscated_instruction", "instruction revealed by de-obfuscation"),
+}
+
+
+def _is_hidden(ch: str) -> bool:
+    return ch in _INVISIBLE_CODEPOINTS or _is_suspicious_control(ch)
+
+
+def _readings(text: str) -> list[str]:
+    """``text`` as a model could read it: NFKC, invisibles dropped or spaced, confusables folded."""
+    normalized = unicodedata.normalize("NFKC", text)
+    dropped = "".join(ch for ch in normalized if ch in "\t\n\r" or not _is_hidden(ch))
+    out = [dropped]
+    spaced = "".join(" " if ch not in "\t\n\r" and _is_hidden(ch) else ch for ch in normalized)
+    if spaced != dropped:
+        out.append(spaced)
+    folded = confusable_view(dropped)
+    if folded:
+        out.append(folded)
+    return out
+
+
+def _views(normalized: str) -> list[tuple[str, str]]:
+    """Alternative readings of the text a model could still understand."""
+    readings = _readings(normalized)
+    visible = readings[0]
+    views: list[tuple[str, str]] = [("deobfuscated", v) for v in readings[1:]]
+    for decoded in decoded_views(visible, morse=_morse_texts):
+        views.extend(("decoded", v) for v in _readings(decoded))
+        if any(_is_hidden(ch) for ch in decoded if ch not in "\t\n\r"):
+            views.append(("decoded_invisible", decoded))
+    views.extend(("hidden_html", v) for v in hidden_html_text(visible))
+    return views
 
 
 def scan_stage0(
@@ -584,6 +656,42 @@ def scan_stage0(
         or (ch not in _INVISIBLE_CODEPOINTS and not _is_suspicious_control(ch))
     )
     findings.extend(_directive_findings(visible))
+    views = _views(normalized)
+    seen: set[str] = set()
+    for source, view in views:
+        if source == "decoded_invisible":
+            if "encoded_invisible" not in seen:
+                seen.add("encoded_invisible")
+                findings.append(
+                    Finding(
+                        kind="encoded_invisible",
+                        message="invisible or bidi control characters inside an encoded payload",
+                        detail={"preview": view[:96]},
+                    )
+                )
+            continue
+        if source == "hidden_html":
+            findings.append(
+                Finding(
+                    kind="css_hidden_text",
+                    message="HTML text hidden by CSS",
+                    detail={"preview": view[:96]},
+                )
+            )
+        inner = [f for f in _directive_findings(view) if f.kind in _INSTRUCTION_KINDS]
+        kind, message = _VIEW_KINDS[source]
+        if inner and kind not in seen:
+            seen.add(kind)
+            findings.append(
+                Finding(
+                    kind=kind,
+                    message=message,
+                    detail={
+                        "rules": sorted({str(f.detail.get("rule", f.kind)) for f in inner}),
+                        "preview": view[:96],
+                    },
+                )
+            )
 
     risk = _score(findings, exceeded=exceeded)
     return Stage0Result(
@@ -593,6 +701,7 @@ def scan_stage0(
         findings=tuple(findings),
         exceeded_size_limit=exceeded,
         risk_score=risk,
+        views=tuple(v for _, v in views),
     )
 
 
@@ -602,9 +711,10 @@ def _score(findings: list[Finding], *, exceeded: bool) -> float:
     weights = {
         "invisible_char": 0.35,
         "control_char": 0.35,
-        "base64_blob": 0.45,
-        "hex_run": 0.4,
-        "percent_encoding": 0.35,
+        # Presence of an encoding is weak evidence; decoded instructions score below.
+        "base64_blob": 0.15,
+        "hex_run": 0.15,
+        "percent_encoding": 0.15,
         "rot13_hint": 0.4,
         "morse_run": 0.45,
         "tool_call_directive": 0.45,
@@ -616,14 +726,44 @@ def _score(findings: list[Finding], *, exceeded: bool) -> float:
         "error_fallback_steering": 0.45,
         "agent_addressed_directive": 0.45,
         "refusal_suppression": 0.45,
-        "css_hidden_text": 0.45,
+        "css_hidden_text": 0.2,
+        "encoded_invisible": 0.45,
+        "override_phrase": 0.45,
+        "injection_intent": 0.45,
+        "encoded_instruction": 0.45,
+        "hidden_instruction": 0.45,
+        "obfuscated_instruction": 0.45,
         "unicode_normalization": 0.1,
         "size_limit": 1.0,
     }
     score = 0.0
+    presence = 0.0
     for finding in findings:
-        score = min(1.0, score + weights.get(finding.kind, 0.2))
+        weight = weights.get(finding.kind, 0.2)
+        if finding.kind in _PRESENCE_KINDS:
+            # Many digests / blobs are still only "this text contains encodings".
+            weight = max(0.0, min(weight, _PRESENCE_CAP - presence))
+            presence += weight
+        score = min(1.0, score + weight)
     return round(score, 4)
+
+
+_PRESENCE_KINDS = frozenset({"base64_blob", "hex_run", "percent_encoding"})
+_PRESENCE_CAP = 0.3
+
+
+@functools.lru_cache(maxsize=16)
+def _cached_scan(text: str, max_bytes: int) -> Stage0Result:
+    return scan_stage0(text, max_bytes=max_bytes)
+
+
+def scan_stage0_cached(text: str, *, max_bytes: int = _DEFAULT_MAX_BYTES) -> Stage0Result:
+    """``scan_stage0`` memoized for the last few inputs (Stage0Result is immutable).
+
+    The cascade's Stage 0 and the rules-only Stage-1 mirror scan the same text; this
+    avoids doing the work twice.
+    """
+    return _cached_scan(text, max_bytes)
 
 
 class RulesDetector:
@@ -633,4 +773,6 @@ class RulesDetector:
         self.max_bytes = max_bytes
 
     def scan(self, text: str) -> Stage0Result:
-        return scan_stage0(text, max_bytes=self.max_bytes)
+        if not isinstance(text, str):
+            raise TypeError("text must be str")
+        return scan_stage0_cached(text, max_bytes=self.max_bytes)

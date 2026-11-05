@@ -15,10 +15,10 @@ from typing import Any, Literal
 
 from containment.detectors.base import RiskSignal, Stage1Detector, label_from_score
 from containment.detectors.cascade import DetectorCascade
-from containment.detectors.rules import scan_stage0
+from containment.detectors.rules import scan_stage0_cached
 
 PIGUARD_MODEL_ID = "leolee99/PIGuard"
-Stage1Backend = Literal["piguard", "rules_only", "fake"]
+Stage1Backend = Literal["piguard", "rules_only", "fake", "onnx"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,7 +41,7 @@ class RulesOnlyDetector:
     name = "rules_only"
 
     def scan(self, text: str) -> RiskSignal:
-        stage0 = scan_stage0(text)
+        stage0 = scan_stage0_cached(text)
         return RiskSignal(
             stage="stage1",
             score=stage0.risk_score,
@@ -173,11 +173,47 @@ class PIGuardDetector:
         )
 
 
+def select_onnx_stage1(model: str | None = None) -> Stage1Selection:
+    """Layered ONNX classifier + structural fusion; **fails closed** when unavailable.
+
+    A model that was asked for but cannot be loaded (missing ``[ml]`` extra, files not
+    fetched, hash mismatch, failed self-test) yields ``UnavailableStage1``: every scan is
+    ``label="error"``, so ingest reports high risk and privileged sinks fail closed.
+    """
+    from containment.detectors.layered import LayeredDetector
+    from containment.detectors.onnx_classifier import (
+        DEFAULT_MODEL,
+        ModelUnavailable,
+        OnnxClassifierDetector,
+        UnavailableStage1,
+    )
+
+    name = model or DEFAULT_MODEL
+    try:
+        classifier = OnnxClassifierDetector.load(name)
+    except ModelUnavailable as exc:
+        return Stage1Selection(
+            backend="onnx",
+            detector=UnavailableStage1(str(exc), name=f"onnx:{name}"),
+            reason=f"onnx model {name} unavailable: {exc}; failing closed",
+            fail_closed_privileged=True,
+        )
+    return Stage1Selection(
+        backend="onnx",
+        detector=LayeredDetector(
+            classifier, t_hi=classifier.spec.t_hi, t_lo=classifier.spec.t_lo
+        ),
+        reason=f"loaded onnx model {name} ({classifier.spec.repo}@{classifier.spec.revision[:12]})",
+        fail_closed_privileged=False,
+    )
+
+
 def select_stage1(
     *,
     prefer: Stage1Backend = "piguard",
     allow_download: bool = False,
     fake: FakeStage1Detector | None = None,
+    model: str | None = None,
 ) -> Stage1Selection:
     """Select Stage-1 backend with fail-closed metadata for privileged sinks.
 
@@ -196,6 +232,8 @@ def select_stage1(
             reason="explicit fake backend for tests/CI",
             fail_closed_privileged=False,
         )
+    if prefer == "onnx":
+        return select_onnx_stage1(model)
     if prefer == "rules_only":
         return Stage1Selection(
             backend="rules_only",
@@ -236,7 +274,8 @@ def stage1_from_env() -> Stage1Selection | None:
     """Build Stage-1 selection from ``CONTAINMENT_STAGE1`` when set.
 
     Env:
-      * ``CONTAINMENT_STAGE1`` = ``rules_only`` | ``piguard`` | ``fake``
+      * ``CONTAINMENT_STAGE1`` = ``rules_only`` | ``piguard`` | ``fake`` | ``onnx`` |
+        ``onnx:<model>`` (e.g. ``onnx:hl-base``; fails closed if the model is unusable)
       * ``CONTAINMENT_PIGUARD_ALLOW_DOWNLOAD`` = ``0``|``1`` / ``false``|``true``
         (only consulted when stage1 is ``piguard``; default false)
 
@@ -246,9 +285,12 @@ def stage1_from_env() -> Stage1Selection | None:
     raw = os.environ.get("CONTAINMENT_STAGE1", "").strip().lower()
     if not raw:
         return None
+    if raw == "onnx" or raw.startswith("onnx:"):
+        model = raw.partition(":")[2] or None
+        return select_onnx_stage1(model)
     if raw not in ("rules_only", "piguard", "fake"):
         raise ValueError(
-            f"CONTAINMENT_STAGE1 must be rules_only|piguard|fake, got {raw!r}"
+            f"CONTAINMENT_STAGE1 must be rules_only|piguard|fake|onnx[:model], got {raw!r}"
         )
     allow = os.environ.get("CONTAINMENT_PIGUARD_ALLOW_DOWNLOAD", "0").strip().lower()
     allow_download = allow in ("1", "true", "yes", "on")

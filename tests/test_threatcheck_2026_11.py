@@ -119,7 +119,7 @@ def test_directive_rules_stay_fast_on_large_input(text: str) -> None:
 def test_suite_asr_zero_and_fpr_within_budget() -> None:
     metrics, outcomes = run_eval(fixtures_root=ROOT, policy_enabled=True)
     assert metrics.asr == 0.0
-    # 1.8.0 step-2 baseline on the expanded benign corpus (222): 13 flagged with the
-    # 1.7.2 detector. Must not get worse.
+    # Expanded benign corpus (222): 13 flagged with the 1.7.2 detector + eval-only hint,
+    # 6 with the 1.8.0 production detector (no hint). Must not get worse.
     assert metrics.n_benign >= 200
-    assert metrics.benign_flagged <= 13
+    assert metrics.benign_flagged <= 6

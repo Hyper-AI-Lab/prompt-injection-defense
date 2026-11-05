@@ -46,7 +46,14 @@ dev = [
 crypto = [
   "cryptography>=42",
 ]
+# Local ONNX Stage-1 classifier (CONTAINMENT_STAGE1=onnx); no torch, no remote code.
 ml = [
+  "onnxruntime>=1.18",
+  "tokenizers>=0.19",
+  "numpy>=1.26",
+]
+# Legacy PIGuard adapter (transformers + torch, trust_remote_code).
+piguard = [
   "transformers>=4.40",
   "torch>=2.0",
 ]

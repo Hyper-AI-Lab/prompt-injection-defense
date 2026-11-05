@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import re
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -22,20 +21,6 @@ from containment.policy import PolicyEngine
 from containment.quarantine import ALLOWLIST_SUMMARY_SCHEMA
 
 CaseKind = Literal["attack", "benign"]
-
-# Align with quarantine instruction patterns (M6) for detector-side scoring.
-_INSTRUCTION_HINT_RE = re.compile(
-    r"(?is)\b("
-    r"ignore\s+(all\s+)?(previous|prior|above)\s+instructions?"
-    r"|system\s+prompt"
-    r"|you\s+are\s+now\b"
-    r"|do\s+not\s+follow\s+your\s+(previous|prior)\b"
-    r"|disregard\s+(all\s+)?(previous|prior)\b"
-    r"|override\s+(all\s+)?(safety|rules?|instructions?)"
-    r"|exfiltrate"
-    r")\b"
-)
-
 
 @dataclass(frozen=True, slots=True)
 class FixtureCase:
@@ -170,15 +155,9 @@ def _policy_denies_case_egress(
 
 
 def _detector_high_risk(result_high_risk: bool, normalized_text: str) -> bool:
-    """Cascade high_risk plus quarantine-aligned instruction hints (M6)."""
-    if result_high_risk:
-        return True
-    lowered = normalized_text.lower()
-    _inv = "\u200b\u200c\u200d\ufeff"
-    cleaned = "".join(ch for ch in lowered if ch.isprintable() and ch not in _inv)
-    if _INSTRUCTION_HINT_RE.search(cleaned) or _INSTRUCTION_HINT_RE.search(lowered):
-        return True
-    return False
+    """The production cascade verdict, unchanged (no eval-only hints since 1.8.0)."""
+    del normalized_text
+    return result_high_risk
 
 
 def evaluate_case(

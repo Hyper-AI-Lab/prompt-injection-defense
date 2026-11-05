@@ -49,7 +49,8 @@ HOST_RESIDUALS: tuple[str, ...] = (
 
 # Optional extras: (check id, import names, extra name, purpose).
 _EXTRAS: tuple[tuple[str, tuple[str, ...], str, str], ...] = (
-    ("extra.ml", ("transformers", "torch"), "ml", "PIGuard Stage-1"),
+    ("extra.ml", ("onnxruntime", "tokenizers", "numpy"), "ml", "ONNX Stage-1 classifier"),
+    ("extra.piguard", ("transformers", "torch"), "piguard", "PIGuard Stage-1 (legacy)"),
     ("extra.crypto", ("cryptography",), "crypto", "Ed25519 intents"),
     ("extra.redis", ("redis",), "redis", "shared consume store"),
 )
@@ -386,7 +387,48 @@ def _extra_checks() -> list[DoctorCheck]:
             ))
         else:
             checks.append(DoctorCheck(check_id, False, "pass", f"installed ({', '.join(modules)})"))
+    checks.append(_stage1_model_check())
     return checks
+
+
+def _stage1_model_check() -> DoctorCheck:
+    """When ``CONTAINMENT_STAGE1=onnx[:model]`` is set, its model must be usable.
+
+    Required in that case: a configured-but-missing model fails closed, which would mark
+    every input high-risk. Files are hash-checked only (no model load, no network).
+    """
+    raw = os.environ.get("CONTAINMENT_STAGE1", "").strip().lower()
+    if not (raw == "onnx" or raw.startswith("onnx:")):
+        return DoctorCheck("stage1.model", False, "skip", "CONTAINMENT_STAGE1 is not onnx")
+    from containment.detectors.onnx_classifier import (
+        DEFAULT_MODEL,
+        MODEL_REGISTRY,
+        model_dir,
+        verify_model,
+    )
+
+    name = raw.partition(":")[2] or DEFAULT_MODEL
+    if name not in MODEL_REGISTRY:
+        return DoctorCheck(
+            "stage1.model", True, "fail", f"unknown model {name!r}",
+            f"use one of: {', '.join(MODEL_REGISTRY)}",
+        )
+    missing = [m for m in ("onnxruntime", "tokenizers", "numpy")
+               if importlib.util.find_spec(m) is None]
+    if missing:
+        return DoctorCheck(
+            "stage1.model", True, "fail",
+            f"onnx Stage-1 configured but {', '.join(missing)} missing (fails closed)",
+            extra_install_hint("ml"),
+        )
+    problems = verify_model(MODEL_REGISTRY[name], model_dir(MODEL_REGISTRY[name]))
+    if problems:
+        return DoctorCheck(
+            "stage1.model", True, "fail",
+            f"model {name}: {'; '.join(problems)} (fails closed)",
+            f"containment models fetch {name}",
+        )
+    return DoctorCheck("stage1.model", True, "pass", f"model {name} verified")
 
 
 def run_doctor(config: DoctorConfig) -> DoctorReport:

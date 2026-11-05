@@ -58,7 +58,7 @@ def _cmd_eval(args: argparse.Namespace) -> int:
         print(f"  utility:  {metrics.utility:.4f}  (benign usable fraction)")
         print(
             f"  detector_block_rate: {metrics.detector_block_rate:.4f}  "
-            "(attacks flagged high-risk by cascade/hints)"
+            "(attacks flagged high-risk by the detector cascade)"
         )
         print(
             f"  policy_block_rate:   {metrics.policy_block_rate:.4f}  "
@@ -136,6 +136,57 @@ def _add_doctor_parser(sub: argparse._SubParsersAction) -> None:
     doc.set_defaults(func=_cmd_doctor)
 
 
+def _cmd_models(args: argparse.Namespace) -> int:
+    from containment.detectors.onnx_classifier import (
+        DEFAULT_MODEL,
+        MODEL_REGISTRY,
+        ModelUnavailable,
+        fetch_model,
+        model_dir,
+        verify_model,
+    )
+
+    if args.models_command == "list":
+        for name, spec in MODEL_REGISTRY.items():
+            state = "ready" if not verify_model(spec, model_dir(spec)) else "not fetched"
+            default = " (default)" if name == DEFAULT_MODEL else ""
+            print(f"{name}{default}: {spec.repo}@{spec.revision[:12]} {spec.license} — {state}")
+            print(f"    {model_dir(spec)}")
+        return 0
+    name = args.name or DEFAULT_MODEL
+    if name not in MODEL_REGISTRY:
+        print(f"unknown model {name!r}; known: {', '.join(MODEL_REGISTRY)}", file=sys.stderr)
+        return 2
+    spec = MODEL_REGISTRY[name]
+    if args.models_command == "fetch":
+        try:
+            directory = fetch_model(spec)
+        except (ModelUnavailable, OSError) as exc:
+            print(f"fetch failed: {exc}", file=sys.stderr)
+            return 1
+        print(f"{name}: verified in {directory}")
+        return 0
+    problems = verify_model(spec, model_dir(spec))
+    if problems:
+        print(f"{name}: NOT ready — {'; '.join(problems)}", file=sys.stderr)
+        return 1
+    print(f"{name}: verified ({spec.repo}@{spec.revision[:12]})")
+    return 0
+
+
+def _add_models_parser(sub: argparse._SubParsersAction) -> None:
+    models = sub.add_parser(
+        "models",
+        help="List, fetch (pinned + SHA-256 verified) or verify optional Stage-1 models",
+    )
+    msub = models.add_subparsers(dest="models_command", required=True)
+    msub.add_parser("list", help="Show registered models and whether they are fetched")
+    for cmd, text in (("fetch", "Download and verify a model"), ("verify", "Re-check hashes")):
+        mp = msub.add_parser(cmd, help=text)
+        mp.add_argument("name", nargs="?", default=None, help="Model name (default: hl-small)")
+    models.set_defaults(func=_cmd_models)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="containment",
@@ -175,6 +226,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ev.set_defaults(func=_cmd_eval)
     _add_doctor_parser(sub)
+    _add_models_parser(sub)
     return parser
 
 

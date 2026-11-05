@@ -27,7 +27,7 @@ from containment.detectors.base import (
     Stage1Detector,
     label_from_score,
 )
-from containment.detectors.rules import RulesDetector, scan_stage0
+from containment.detectors.rules import RulesDetector, scan_stage0_cached
 
 # Tools that must not proceed on detector error / missing Stage-1 weights
 # without an explicit policy allow + independent approval path.
@@ -67,7 +67,7 @@ class PassthroughStage1:
         self.name = name
 
     def scan(self, text: str) -> RiskSignal:
-        stage0 = scan_stage0(text)
+        stage0 = scan_stage0_cached(text)
         return RiskSignal(
             stage="stage1",
             score=stage0.risk_score,
@@ -116,12 +116,15 @@ class DetectorCascade:
         stage1: Stage1Detector | None = None,
         stage2: ContextualDetector | None = None,
         run_stage2: bool = False,
-        stage1_timeout_s: float = 5.0,
+        stage1_timeout_s: float | None = None,
     ) -> None:
         self.stage0 = stage0 or RulesDetector()
         self.stage1 = stage1 or PassthroughStage1()
         self.stage2 = stage2 if stage2 is not None else NoOpContextualDetector()
         self.run_stage2 = run_stage2
+        if stage1_timeout_s is None:
+            # Model-backed Stage-1 detectors declare a realistic CPU budget; default 5 s.
+            stage1_timeout_s = float(getattr(self.stage1, "default_timeout_s", 5.0))
         if stage1_timeout_s <= 0:
             raise ValueError("stage1_timeout_s must be positive")
         self.stage1_timeout_s = float(stage1_timeout_s)
@@ -153,7 +156,11 @@ class DetectorCascade:
         detector_name = getattr(self.stage1, "name", type(self.stage1).__name__)
         try:
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                fut = pool.submit(self.stage1.scan, s0.normalized_text)
+                if getattr(self.stage1, "accepts_views", False):
+                    # Layered detectors also read decoded / de-obfuscated / hidden text.
+                    fut = pool.submit(self.stage1.scan, s0.normalized_text, s0.views)
+                else:
+                    fut = pool.submit(self.stage1.scan, s0.normalized_text)
                 try:
                     signal1 = fut.result(timeout=self.stage1_timeout_s)
                 except concurrent.futures.TimeoutError:
@@ -217,10 +224,16 @@ class DetectorCascade:
         *,
         context: Mapping[str, Any] | None = None,
     ) -> CascadeResult:
-        """Scan each chunk of one document; return the worst chunk's result."""
+        """Scan each chunk and each adjacent pair of one document; return the worst result.
+
+        Pairs catch a payload split across a chunk boundary ("part 1 ... part 2").
+        """
         if not chunks:
             raise ValueError("chunks must be non-empty")
-        results = [self.scan(chunk, context=context) for chunk in chunks]
+        texts = list(chunks) + [a + "\n" + b for a, b in zip(chunks, chunks[1:], strict=False)]
+        if len(chunks) > 2:
+            texts.append("\n".join(chunks))
+        results = [self.scan(text, context=context) for text in texts]
         return max(results, key=_severity)
 
 

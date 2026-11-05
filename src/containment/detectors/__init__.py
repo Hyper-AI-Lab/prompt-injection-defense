@@ -13,12 +13,15 @@ from containment.detectors.cascade import (
     PassthroughStage1,
     privileged_sink_fail_closed,
 )
+from containment.detectors.layered import LayeredDetector
+from containment.detectors.llm_judge import LLMJudgeDetector, stage2_from_env
 from containment.detectors.piguard import (
     FakeStage1Detector,
     PIGuardDetector,
     RulesOnlyDetector,
     Stage1Selection,
     make_stage1_cascade,
+    select_onnx_stage1,
     select_stage1,
     stage1_from_env,
 )
@@ -29,6 +32,8 @@ __all__ = [
     "ContextualDetector",
     "DetectorCascade",
     "FakeStage1Detector",
+    "LLMJudgeDetector",
+    "LayeredDetector",
     "Finding",
     "NoOpContextualDetector",
     "PIGuardDetector",
@@ -42,7 +47,9 @@ __all__ = [
     "Stage1Selection",
     "privileged_sink_fail_closed",
     "scan_stage0",
+    "select_onnx_stage1",
     "select_stage1",
     "make_stage1_cascade",
     "stage1_from_env",
+    "stage2_from_env",
 ]

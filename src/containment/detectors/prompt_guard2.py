@@ -116,7 +116,7 @@ def prompt_guard2_status() -> dict[str, Any]:
     except ImportError:
         return {
             "available": False,
-            "reason": "transformers not installed (optional extra [ml])",
+            "reason": "transformers not installed (optional extra [piguard])",
             "model_ids": list(PROMPT_GUARD2_MODEL_IDS),
         }
     return {

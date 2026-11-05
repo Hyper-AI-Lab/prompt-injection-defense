@@ -46,7 +46,9 @@ def test_offline_eval_runs_and_control() -> None:
     assert 0.0 <= on.utility <= 1.0
     assert 0.0 <= on.detector_block_rate <= 1.0
     assert 0.0 <= on.policy_block_rate <= 1.0
-    # Honesty: detector rate is not a silent constant identical deny for every attack.
+    # Honesty: the detector verdict is computed per case, not a constant deny.
     det = [o.detector_blocked for o in on_out if o.case.kind == "attack"]
-    assert any(det) and not all(det), "detector_blocked must vary across attacks"
+    benign_det = [o.detector_blocked for o in on_out if o.case.kind == "benign"]
+    assert any(det), "detector must flag some attacks"
+    assert not all(benign_det), "detector must not flag every benign case"
     assert off.policy_block_rate == 0.0
