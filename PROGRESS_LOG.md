@@ -2864,3 +2864,17 @@ Last measured: mutation recall 100.0% train / 100.0% holdout both modes; benign 
 (no-model), 8/263 (ONNX); gap suite closed on holdout both modes (long_doc is model-only by
 design); 440 tests pass; ruff clean. Resuming at: CHANGELOG/docs/DECISIONS, release gate, push,
 CI, GitHub-only release, skill pins + release venv, doctor, final report. No finished step redone.
+
+## 2026-11-07 (JST) — v1.9.0 released (GitHub only)
+
+All six blind spots closed. Released https://github.com/Hyper-AI-Lab/prompt-injection-defense/releases/tag/v1.9.0
+- Commits: d106912 (no-model gaps), dd11827 (gap 3 budget/fail-closed + gap 5 judge), 9370179
+  (version/CHANGELOG/docs). CI 42374196962 green (ml-eval + gate). publish.yml 42374683288:
+  build success, PyPI publish job skipped (GitHub only, per constraint). Attestations verified
+  for wheel + sdist.
+- Final eval: mutation recall 100.0% train / 100.0% holdout, both no-model and ONNX; benign FP
+  2/263 (no-model), 8/263 (ONNX); ASR policy-on 0.0000; gap suite closed on holdout both modes
+  (long_doc ONNX-only by design). release_gate + eval-card gate PASS. 440 tests pass.
+- Skill pin /home/box/agent-data/workflows/containment-untrusted-content/SKILL.md bumped
+  v1.8.0 -> v1.9.0; /workspace/.venvs/containment reinstalled at 1.9.0; doctor install-only OK,
+  ml venv stage1.model hl-small verified.
