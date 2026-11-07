@@ -13,6 +13,8 @@ Stage-0 rules still score independently in the cascade; this layer only adds rec
 
 from __future__ import annotations
 
+import os
+import time
 from collections.abc import Sequence
 from typing import Protocol
 
@@ -22,7 +24,23 @@ from containment.detectors.structural import ACTION_CATEGORIES, weak_signal
 # Tuned on the train split (see DECISIONS.md, 1.8.0 / scripts in EVAL_CARD.md).
 DEFAULT_T_HI = 0.9
 DEFAULT_T_LO = 0.5
-_MAX_VIEW_CHARS = 64_000
+# Cap only for the structural-cue regex pass (a secondary booster); the classifier always
+# reads the whole document via its own sliding-window + budget path.
+_MAX_CUE_CHARS = 256_000
+_DEFAULT_BUDGET_S = 45.0
+# Fail-closed floor when the budget is exhausted: at least "suspicious".
+_BUDGET_FAIL_FLOOR = 0.4
+
+
+def _budget_from_env() -> float:
+    raw = os.environ.get("CONTAINMENT_STAGE1_BUDGET_S")
+    if not raw:
+        return _DEFAULT_BUDGET_S
+    try:
+        val = float(raw)
+    except ValueError:
+        return _DEFAULT_BUDGET_S
+    return val if val > 0 else _DEFAULT_BUDGET_S
 
 
 class ProbabilityModel(Protocol):
@@ -50,6 +68,7 @@ class LayeredDetector:
         self.model = model
         self.t_hi = float(t_hi)
         self.t_lo = float(t_lo)
+        self.budget_s = _budget_from_env()
         self.name = f"layered:{getattr(model, 'name', type(model).__name__)}"
 
     def _score(self, p: float, cues: frozenset[str]) -> float:
@@ -60,15 +79,50 @@ class LayeredDetector:
             return 0.4
         return 0.39 * p / self.t_hi
 
+    def _model_prob(self, reading: str, budget_s: float) -> tuple[float, bool]:
+        budgeted = getattr(self.model, "probability_budgeted", None)
+        if callable(budgeted):
+            return budgeted(reading, budget_s)
+        return self.model.probability(reading), False
+
     def scan(self, text: str, views: Sequence[str] = ()) -> RiskSignal:
         if not isinstance(text, str):
             raise TypeError("text must be str")
-        readings = [text, *views]
-        joined = "\n\n".join(r for r in readings if r.strip())[: _MAX_VIEW_CHARS * 4]
-        if not joined.strip():
+        readings = [r for r in (text, *views) if r.strip()]
+        if not readings:
             return RiskSignal(stage="stage1", score=0.0, label="benign", detector=self.name)
-        p = max(self.model.probability(r[:_MAX_VIEW_CHARS]) for r in readings if r.strip())
-        cues = weak_signal(joined)
+        # Scan the whole document (every reading, in full) under one shared wall-clock budget;
+        # never silently drop a tail. Exhausting the budget fails closed (elevated risk).
+        deadline = time.monotonic() + self.budget_s
+        p = 0.0
+        exhausted = False
+        for reading in readings:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                exhausted = True
+                break
+            rp, rex = self._model_prob(reading, remaining)
+            p = max(p, rp)
+            exhausted = exhausted or rex
+            if exhausted:
+                break
+        cues = weak_signal("\n\n".join(readings)[:_MAX_CUE_CHARS])
+        if exhausted:
+            score = round(min(1.0, max(self._score(p, cues), _BUDGET_FAIL_FLOOR)), 4)
+            return RiskSignal(
+                stage="stage1",
+                score=score,
+                label="error",
+                detector=self.name,
+                detail={
+                    "error": "budget_exceeded",
+                    "budget_s": self.budget_s,
+                    "probability": round(p, 4),
+                    "t_hi": self.t_hi,
+                    "t_lo": self.t_lo,
+                    "cues": sorted(cues),
+                },
+            )
         score = round(min(1.0, self._score(p, cues)), 4)
         return RiskSignal(
             stage="stage1",

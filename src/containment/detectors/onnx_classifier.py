@@ -17,6 +17,7 @@ import hashlib
 import os
 import tempfile
 import threading
+import time
 import urllib.request
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -29,6 +30,25 @@ from containment.detectors.base import RiskSignal, label_from_score
 
 class ModelUnavailable(RuntimeError):
     """Raised when a configured model, its dependencies or its files are not usable."""
+
+
+# Whole-document scanning: a wall-clock budget bounds the sliding-window sweep. If the budget
+# is exhausted before every window is scored, the scan fails closed (elevated risk) rather than
+# silently dropping the unscanned tail.
+_DEFAULT_BUDGET_S = 45.0
+# Fail-closed floor: at least "suspicious" so the cascade treats a budget-exhausted scan as risky.
+_BUDGET_FAIL_FLOOR = 0.4
+
+
+def _budget_from_env() -> float:
+    raw = os.environ.get("CONTAINMENT_STAGE1_BUDGET_S")
+    if not raw:
+        return _DEFAULT_BUDGET_S
+    try:
+        val = float(raw)
+    except ValueError:
+        return _DEFAULT_BUDGET_S
+    return val if val > 0 else _DEFAULT_BUDGET_S
 
 
 @dataclass(frozen=True, slots=True)
@@ -191,6 +211,10 @@ class OnnxClassifierDetector:
         self._np = np
         self._inputs = {i.name for i in session.get_inputs()}
         self._lock = threading.Lock()
+        # Batch size for a single inference call (bounds peak memory); the whole document is
+        # still covered across as many batches as its length requires.
+        self._batch = max(1, spec.max_windows)
+        self.budget_s = _budget_from_env()
 
     @classmethod
     def load(
@@ -244,15 +268,13 @@ class OnnxClassifierDetector:
             )
         return detector
 
-    def _windows(self, text: str) -> list[Any]:
+    def _all_windows(self, text: str) -> list[Any]:
+        """Every overlapping token window covering the whole document (stride = spec.stride)."""
         enc = self._tokenizer.encode(text)
-        windows = [enc, *enc.overflowing]
-        return windows[: self.spec.max_windows]
+        return [enc, *enc.overflowing]
 
-    def probability(self, text: str) -> float:
-        """Highest injection probability over the text's token windows."""
+    def _run_batch(self, windows: list[Any]) -> float:
         np = self._np
-        windows = self._windows(text)
         width = max(len(w.ids) for w in windows)
         ids = np.zeros((len(windows), width), dtype=np.int64)
         mask = np.zeros((len(windows), width), dtype=np.int64)
@@ -268,18 +290,69 @@ class OnnxClassifierDetector:
         probs = np.exp(logits) / np.exp(logits).sum(axis=1, keepdims=True)
         return float(probs[:, self.spec.injection_index].max())
 
+    def _probability_budgeted(self, text: str, budget_s: float) -> tuple[float, bool, int, int]:
+        """Scan every window in batches until done or the wall-clock budget runs out.
+
+        Returns ``(max_probability, budget_exhausted, windows_scanned, windows_total)``. At least
+        one batch always runs, so a result is produced even under a tiny budget; any remaining
+        windows then mark the scan as exhausted (the caller fails closed).
+        """
+        windows = self._all_windows(text)
+        total = len(windows)
+        best = 0.0
+        scanned = 0
+        deadline = time.monotonic() + budget_s
+        for i in range(0, total, self._batch):
+            if i > 0 and time.monotonic() > deadline:
+                return best, True, scanned, total
+            chunk = windows[i : i + self._batch]
+            best = max(best, self._run_batch(chunk))
+            scanned += len(chunk)
+        return best, False, scanned, total
+
+    def probability(self, text: str) -> float:
+        """Highest injection probability over the whole document (unbounded budget)."""
+        best, _, _, _ = self._probability_budgeted(text, float("inf"))
+        return best
+
+    def probability_budgeted(self, text: str, budget_s: float) -> tuple[float, bool]:
+        """Whole-document probability under a wall-clock budget.
+
+        Returns ``(max_probability, budget_exhausted)``. When exhausted, the unscanned tail was
+        not examined and the caller must fail closed.
+        """
+        best, exhausted, _, _ = self._probability_budgeted(text, budget_s)
+        return best, exhausted
+
     def scan(self, text: str) -> RiskSignal:
         if not isinstance(text, str):
             raise TypeError("text must be str")
         if not text.strip():
             return RiskSignal(stage="stage1", score=0.0, label="benign", detector=self.name)
-        p = self.probability(text)
+        p, exhausted, scanned, total = self._probability_budgeted(text, self.budget_s)
+        base = {"model": self.spec.repo, "revision": self.spec.revision}
+        if exhausted:
+            # Fail closed: never silently skip the unscanned tail. Report an error-labelled,
+            # elevated-risk signal so the policy treats the document as risky.
+            return RiskSignal(
+                stage="stage1",
+                score=max(round(p, 4), _BUDGET_FAIL_FLOOR),
+                label="error",
+                detector=self.name,
+                detail={
+                    **base,
+                    "error": "budget_exceeded",
+                    "budget_s": self.budget_s,
+                    "windows_scanned": scanned,
+                    "windows_total": total,
+                },
+            )
         return RiskSignal(
             stage="stage1",
             score=round(p, 4),
             label=label_from_score(p),
             detector=self.name,
-            detail={"model": self.spec.repo, "revision": self.spec.revision},
+            detail={**base, "windows_scanned": scanned, "windows_total": total},
         )
 
 

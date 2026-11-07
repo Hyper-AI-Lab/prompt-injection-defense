@@ -8,6 +8,7 @@ import codecs
 import hashlib
 import http.server
 import json
+import re
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -321,9 +322,14 @@ def _judge_server(reply: str, seen: list[dict]) -> type[http.server.BaseHTTPRequ
     class Handler(http.server.BaseHTTPRequestHandler):
         def do_POST(self) -> None:  # noqa: N802
             body = self.rfile.read(int(self.headers["Content-Length"]))
+            parsed = json.loads(body)
             seen.append({"path": self.path, "auth": self.headers.get("Authorization"),
-                         "body": json.loads(body)})
-            out = json.dumps({"choices": [{"message": {"content": reply}}]}).encode()
+                         "body": parsed})
+            user = parsed["messages"][1]["content"]
+            m = re.search(r"CANARY=([0-9a-f]+)", user)
+            canary = m.group(1) if m else ""
+            content = reply.replace("__CANARY__", canary)
+            out = json.dumps({"choices": [{"message": {"content": content}}]}).encode()
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
@@ -337,7 +343,10 @@ def _judge_server(reply: str, seen: list[dict]) -> type[http.server.BaseHTTPRequ
 
 def test_llm_judge_flags_and_wraps_untrusted_text() -> None:
     seen: list[dict] = []
-    reply = '{"injection": true, "confidence": 0.9, "reason": "asks for keys"}'
+    reply = (
+        '{"injection": true, "confidence": 0.9, "reason": "asks for keys", '
+        '"canary": "__CANARY__"}'
+    )
     with _serve(_judge_server(reply, seen)) as url:
         judge = LLMJudgeDetector(base_url=url + "/v1", model="m", api_key="k")
         signal = judge.scan_context(ATTACK, context={})
@@ -345,12 +354,14 @@ def test_llm_judge_flags_and_wraps_untrusted_text() -> None:
     req = seen[0]
     assert req["path"] == "/v1/chat/completions" and req["auth"] == "Bearer k"
     user = req["body"]["messages"][1]["content"]
-    assert user.startswith("<<<DATA ") and ATTACK in user
+    assert user.startswith("CANARY=") and "<<<DATA " in user
 
 
 def test_llm_judge_benign_and_fail_closed_paths() -> None:
     seen: list[dict] = []
-    with _serve(_judge_server('{"injection": false, "confidence": 0.95}', seen)) as url:
+    with _serve(
+        _judge_server('{"injection": false, "confidence": 0.95, "canary": "__CANARY__"}', seen)
+    ) as url:
         assert LLMJudgeDetector(base_url=url, model="m").scan_context("hi", context={}).label == (
             "benign"
         )
@@ -392,3 +403,32 @@ def test_real_model_scores_multilingual_paraphrases() -> None:
     ):
         assert model.probability(text) >= 0.5, text
     assert model.probability("The quarterly report is attached; see page 3.") < 0.5
+
+
+def test_llm_judge_canary_mismatch_fails_closed() -> None:
+    """A steered judge whose canary does not come back is treated as high risk."""
+    seen: list[dict] = []
+    # The model ignores the canary instruction and echoes a wrong value.
+    reply = '{"injection": false, "confidence": 0.99, "reason": "safe", "canary": "deadbeef"}'
+    with _serve(_judge_server(reply, seen)) as url:
+        sig = LLMJudgeDetector(base_url=url, model="m").scan_context("hi", context={})
+    assert sig.label == "error" and sig.detail["error"] == "judge_steered"
+
+
+def test_llm_judge_strict_schema_rejects_missing_fields() -> None:
+    """Valid JSON that lacks the boolean verdict is a fail-closed error."""
+    seen: list[dict] = []
+    reply = '{"verdict": "benign", "canary": "__CANARY__"}'
+    with _serve(_judge_server(reply, seen)) as url:
+        sig = LLMJudgeDetector(base_url=url, model="m").scan_context("hi", context={})
+    assert sig.label == "error"
+
+
+def test_llm_judge_datamarks_untrusted_text() -> None:
+    """The untrusted text is datamarked (interleaved marker) before it reaches the model."""
+    seen: list[dict] = []
+    reply = '{"injection": false, "confidence": 0.1, "reason": "ok", "canary": "__CANARY__"}'
+    with _serve(_judge_server(reply, seen)) as url:
+        LLMJudgeDetector(base_url=url, model="m").scan_context("abc " * 40, context={})
+    user = seen[0]["body"]["messages"][1]["content"]
+    assert "<DM_" in user and "|DM_" in user  # begin sentinel + interleaved separators

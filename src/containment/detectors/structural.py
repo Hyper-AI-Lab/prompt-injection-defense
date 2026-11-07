@@ -255,7 +255,8 @@ _TOOL_CALL = _rx(
 )
 _SELF = _rx(r"\byourself\b|\bits\s+own\b|\bсебе\b|自分|自身")
 _DISCUSSION = _rx(
-    r"\battackers\b|\ban\s+attacker\b|\bprompt\s+injection|\bjailbreak\w*|\bred[\s-]team\w*|"
+    r"\battackers\b|\ban\s+attacker\b|\bprompt[\s-]?injection|\binjection\s+(?:attack|example|payload)|"
+    r"\bjailbreak\w*|\bred[\s-]team\w*|\battacker-controlled\b|"
     r"\bfor\s+example\b|\be\.g\.|\bsuch\s+as\b|\bred\s+flags?\b|\bsocial\s+engineering\b|"
     r"\bphishing\b",
     r"промпт-инъекц\w*|злоумышленник\w*|например|фишинг\w*",
