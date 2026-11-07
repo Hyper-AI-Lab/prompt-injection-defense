@@ -488,10 +488,26 @@ Details: `DETECTOR_1_8_0_PLAN.md` (audit), `docs/EVAL_CARD.md` (numbers).
   PIGuard as default (needs `trust_remote_code` + torch; kept as legacy `[piguard]`).
 - CPU latency: hl-small ~90 ms for 1 KB, ~145–155 ms/KB above (4 threads, loaded box).
 
+### 1.9.0 — tightening the 1.8.0 blind spots
+- The six reported gaps are closed with structural rules (no retraining): document-level
+  **staged intent** (collect-secret + transmit-to-sink aggregated across chunks),
+  **tool-metadata exfil** and **policy-tamper** rules (object-bound, negation/narrative-aware),
+  and **quoted/embedded-obey** findings that surface via
+  `CascadeResult.contains_instruction_text` without exploding benign-article FPs.
+- Gap 3: the ONNX layer no longer truncates to the first ~64 KB. It scans the whole document
+  in batched sliding windows under `CONTAINMENT_STAGE1_BUDGET_S` (default 45 s) and **fails
+  closed** on budget exhaustion. This is slower on very large inputs by design (never skips a
+  tail) but bounded.
+- Gap 5: the LLM judge datamarks/spotlights untrusted text, enforces a strict output schema,
+  and uses a per-call canary to detect steering; any failure fails closed. Raise-only.
+- Every threshold and rule change was tuned on the train split only. The gap suite and a fresh
+  benign batch were frozen (committed) before any change; their holdout partitions are the
+  honest 1.9.0 measure.
+
 ### Accepted residuals
-No detector catches every injection; containment (labels → policy → broker) is the
-guarantee. Held-out misses: goal-decomposition diagnostics, MCP tool-description
-log-to-leak (zero-dep), terse policy-tampering paraphrases (zero-dep). Quoted injections
-inside attack-discussion text are treated as mentions. The ONNX layer reads the first 64
-token windows (~100 KB); Stage 0 reads up to the 256 KB size limit. Zero-dep Stage 0 is
-~5–10x slower than 1.7.2 (11–23 ms/KB).
+No detector catches every injection; containment (labels → policy → broker) is the guarantee.
+Remaining: long-document planted payloads are caught only in ONNX mode (zero-dep Stage 0 by
+design does not classify neutral-looking prose). Benign false positives in ONNX mode are the
+classifier's own calls on security-adjacent near-misses (e.g. phishing-training and
+security-checklist docs). Zero-dep Stage 0 is ~5–10x slower than 1.7.2 (~16–32 ms/KB on a
+loaded box); ONNX whole-document scanning is ~105–165 ms/KB.

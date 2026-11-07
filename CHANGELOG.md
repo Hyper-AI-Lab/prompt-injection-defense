@@ -9,6 +9,53 @@ They are not a benchmark claim; see `docs/EVAL_CARD.md` for scope.
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-11-07
+
+Tightens the six blind spots reported for 1.8.0. The detector still never authorizes;
+policy and capability containment remain the guarantee (`docs/THREAT_MODEL.md`).
+
+### Added
+- Held-out gap suite `fixtures/gaps/gaps.yaml` + `containment eval --suite gaps`: 40 items
+  (multi-step staged intent, tool-metadata exfil, policy tampering, quoted/discussed
+  injection, long-document planted payloads) with a frozen train/holdout split, committed
+  before any detector change so its holdout partition is an honest measure.
+- Cross-chunk / document-level **staged intent** (gap 1): a collect-step on a secret plus a
+  transmit-step to a destination, aggregated across the whole document (EN/RU/JA), flags even
+  when no single sentence is malicious.
+- **Tool-metadata exfil** and **policy-tamper** structural rules (gap 2), caught in no-model
+  mode: descriptions that ask to log/mirror/forward/CC conversation or user data to a sink,
+  and imperatives that disable/erase/relax a named protection (default_deny, guardrails,
+  allowlist, rate limiter, approval requirement, safety filters…), object-bound and
+  negation/narrative-aware.
+- **Quoted / discussed injection** surfacing (gap 4): `quoted_instruction` (low severity) and
+  `embedded_obey_instruction` findings, plus `CascadeResult.contains_instruction_text`, so a
+  host can treat quoted payloads as live instructions even when the article itself stays below
+  the risk line. Benign security articles do not explode false positives.
+- Whole-document ONNX scanning under a wall-clock budget (gap 3): the classifier now covers the
+  entire document with overlapping sliding windows (no silent ~64 KB head cap). The budget is
+  `CONTAINMENT_STAGE1_BUDGET_S` (default 45 s); if it is exhausted before every window is
+  scored, the scan **fails closed** (error-labelled, elevated risk) rather than skipping the
+  tail.
+- LLM judge hardening (gap 5): untrusted text is **datamarked** (interleaved per-call marker)
+  and spotlighted; the judge must return a strict JSON schema and echo a per-call **canary**;
+  any parse failure, schema violation, or canary mismatch is treated as steering and fails
+  closed. The judge can still only *raise* risk.
+
+### Changed
+- Destructive verbs (disable/turn off/erase/delete/remove…) moved from the override lexicon to
+  the dedicated policy-tamper rule; override now requires an instruction qualifier or directive.
+- `_DISCUSSION` recognises hyphenated "prompt-injection" and more article framings, so quoted
+  payloads inside explainers are correctly treated as mentions.
+
+### Eval (detector-only; see `docs/EVAL_CARD.md` for scope)
+- Mutation paraphrase recall: **100.0%** train / **100.0%** holdout, both no-model and ONNX
+  (hl-small). Up from 1.8.0's 90.2% / 97.9% holdout.
+- Benign false positives: **2/263** no-model, **8/263** ONNX (down from a 12/263 no-model
+  pre-fix baseline). Gap suite closed on holdout in both modes (long-document payloads are
+  model-only by design).
+- Attack success rate with policy on: **0**.
+- Latency (loaded box): zero-dependency ~16–32 ms/KB; ONNX whole-document ~105–165 ms/KB.
+
 ## [1.8.0] - 2026-11-05
 
 The detector now aims to catch prompt injection regardless of wording. **No detector

@@ -78,10 +78,11 @@ CSS hiding (including `<style>` classes), invisible-character and homoglyph de-o
 and chunk joins. **No detector catches every injection**; policy and capability containment
 are the guarantee ([docs/THREAT_MODEL.md](docs/THREAT_MODEL.md)).
 
-- **Zero-dependency (default):** held-out paraphrase recall 90.2 %, 6/222 benign flagged,
+- **Zero-dependency (default):** held-out paraphrase recall 100 %, 2/263 benign flagged,
   ~11–23 ms/KB.
 - **ONNX layer (optional, CPU, local):** a pinned, hash-verified multilingual classifier fused
-  with the structural cues; held-out recall 97.9 %, 8/222 benign flagged, ~150 ms/KB.
+  with the structural cues; held-out recall 100 %, 8/263 benign flagged, ~105–165 ms/KB
+  (whole-document scan under `CONTAINMENT_STAGE1_BUDGET_S`, fail-closed on budget).
   A configured model that cannot load **fails closed**.
 
 ```bash

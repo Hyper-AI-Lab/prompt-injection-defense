@@ -63,7 +63,7 @@ is influenced by injected instructions.
 language has unbounded ways to phrase an instruction; attackers can adapt to any fixed
 detector (rules, classifier or LLM judge). The detector cascade is built to be
 wording-independent and to catch as much as it can — on the held-out paraphrase eval it
-flags 90.2 % of variants with no dependencies and 97.9 % with the ONNX layer (see
+flags 100 % of held-out variants with no dependencies and 100 % with the ONNX layer as of
 `docs/EVAL_CARD.md`) — but the remaining misses are real, and so are false positives.
 
 The guarantee comes from **policy and capability containment**: untrusted content is
@@ -80,8 +80,10 @@ by itself authorize a privileged action.
   each step looks harmless (goal decomposition); MCP tool descriptions asking to log/forward
   data (zero-dep mode); terse policy-tampering paraphrases ("erase the default_deny policy")
   in zero-dep mode; injections quoted inside text that also discusses attacks (the quote
-  dampener treats them as mentions); text beyond ~100 KB is scored by Stage 0 only (the ONNX
-  layer reads the first 64 token windows); the LLM judge itself reads untrusted text and can
+  dampener treats them as mentions, but they are still surfaced via
+  `CascadeResult.contains_instruction_text`); the ONNX layer scans the whole document under a
+  wall-clock budget (`CONTAINMENT_STAGE1_BUDGET_S`, default 45 s) and fails closed if the
+  budget is exhausted; the LLM judge itself reads untrusted text and can
   be steered (it can only raise risk).
 - Does not replace OS process isolation. In-package interfaces cover vault-shaped
   secrets (`SecretProvider`), audit export (`AuditShipper`), rate gates, and an

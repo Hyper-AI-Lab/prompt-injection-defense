@@ -2854,3 +2854,13 @@ Results (zero-dependency / rules-only):
 
 Remaining for Step 2+: gap 3 (ONNX sliding-window + time budget + fail-closed), gap 5 (LLM
 judge hardening), held-out regression tests, docs, version bump, release.
+
+## 2026-11-07 (JST) — v1.9.0 interruption #2 (resuming)
+
+Interrupted right after bumping the version to 1.9.0 (pyproject + __version__, uncommitted).
+State verified: all six blind-spot fixes are implemented and committed (d106912 no-model gaps;
+dd11827 gap 3 whole-doc ONNX budget/fail-closed + gap 5 judge hardening + held-out tests).
+Last measured: mutation recall 100.0% train / 100.0% holdout both modes; benign FP 2/263
+(no-model), 8/263 (ONNX); gap suite closed on holdout both modes (long_doc is model-only by
+design); 440 tests pass; ruff clean. Resuming at: CHANGELOG/docs/DECISIONS, release gate, push,
+CI, GitHub-only release, skill pins + release venv, doctor, final report. No finished step redone.

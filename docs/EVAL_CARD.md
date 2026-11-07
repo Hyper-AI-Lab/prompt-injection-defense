@@ -96,6 +96,26 @@ Recall, train / holdout (variants of the same attack case are never split):
 ¹ 1.7.2 flagged any base64/hex presence (also hashes, JWTs, images); 1.8.0 flags decoded
 instructions and caps presence-only findings below the threshold.
 
+### 1.9.0 — blind-spot tightening (held-out)
+
+1.9.0 closes the six reported 1.8.0 gaps with structural rules (no retraining) and whole-
+document ONNX scanning. A frozen held-out **gap suite** (`containment eval --suite gaps`,
+`fixtures/gaps/gaps.yaml`) and a fresh benign batch were committed **before** any change.
+
+| metric | 1.8.0 holdout | 1.9.0 holdout |
+| --- | --- | --- |
+| mutation recall, zero-dep | 90.2 % | **100 %** |
+| mutation recall, ONNX hl-small | 97.9 % | **100 %** |
+| benign flagged, zero-dep | 4 / 61 | **1 / 72** |
+| benign flagged, ONNX | 5 / 61 | **3 / 72** |
+
+Benign corpus grew to **263 files** (191 train / 72 holdout) with 41 security-adjacent near-
+misses (IAM/firewall/policy docs, phishing-training, tool READMEs that log/mirror/forward/CC,
+multi-step runbooks, multilingual). Gap suite: multistep, tool_meta, policy_tamper and quoted
+are closed on holdout in both modes; long-document planted payloads are caught in ONNX mode
+only (zero-dep Stage 0 does not classify neutral-looking prose). ASR policy-on: 0. Remaining
+ONNX benign FPs are the classifier's own calls on hard near-misses.
+
 Train recall of 100 % reflects tuning on train; read the holdout column. Latency (8 vCPU,
 loaded box): zero-dep 11–23 ms/KB; ONNX hl-small ≈ 90 ms for 1 KB, ≈ 145–155 ms/KB above.
 No detector catches every injection — see `docs/THREAT_MODEL.md`.

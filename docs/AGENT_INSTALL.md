@@ -132,6 +132,15 @@ re-checks the pinned SHA-256 and runs a self-test. If the model was asked for an
 used, Stage 1 returns `error` for every input (high risk; privileged sinks fail closed) —
 there is no silent fallback.
 
+Stage 1 scans the **whole document** with overlapping sliding windows (no silent head cap)
+under a wall-clock budget `CONTAINMENT_STAGE1_BUDGET_S` (default 45 s). If the budget is
+exhausted before every window is scored, the scan **fails closed** (`error`, elevated risk)
+rather than skipping the unscanned tail.
+
+The optional Stage-2 LLM judge datamarks and spotlights the untrusted text, requires a strict
+JSON reply, and echoes a per-call canary; any parse failure, schema violation, or canary
+mismatch is treated as steering and fails closed. The judge can only raise risk.
+
 Or wire explicitly:
 
 ```python
@@ -160,6 +169,7 @@ Notes:
 - No detector catches every injection; detectors never authorize. Policy/broker are the
   guarantee.
 - Env vars: `CONTAINMENT_STAGE1=rules_only|onnx[:model]|piguard|fake`,
+  `CONTAINMENT_STAGE1_BUDGET_S` (whole-document scan budget, default 45),
   `CONTAINMENT_PIGUARD_ALLOW_DOWNLOAD=0|1` (legacy PIGuard via the `[piguard]` extra, needs
   `trust_remote_code`), `CONTAINMENT_STAGE2=llm` (see also `CONTAINMENT_LIVE_MOLTBOOK`).
 
