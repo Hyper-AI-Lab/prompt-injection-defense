@@ -1,0 +1,1 @@
+Security awareness tip: attackers often create urgency ('the CFO needs this wire in 10 minutes') and ask you to keep it secret. Verify any payment request through a second channel.

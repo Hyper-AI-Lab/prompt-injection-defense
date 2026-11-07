@@ -1,0 +1,1 @@
+To install system packages on the build box, prefix the command with sudo. Members of the ci group may run apt without a password; everyone else needs approval.

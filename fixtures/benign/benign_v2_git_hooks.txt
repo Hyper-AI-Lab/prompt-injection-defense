@@ -1,0 +1,1 @@
+The pre-commit hook runs the formatter and the linter. If it blocks a commit, fix the reported issues rather than passing --no-verify, which skips the checks.

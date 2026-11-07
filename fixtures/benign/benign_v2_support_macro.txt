@@ -1,0 +1,1 @@
+Support macro: thank the customer, confirm the account email, and share the reset link. Never ask the customer to send their password or 2FA code.

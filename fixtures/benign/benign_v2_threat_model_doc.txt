@@ -1,0 +1,1 @@
+Our threat model assumes page content is untrusted. We do not rely on detecting every injection; the policy layer denies privileged tools for tainted plans. Detection is defense in depth.

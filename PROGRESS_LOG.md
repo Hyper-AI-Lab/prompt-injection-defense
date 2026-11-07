@@ -2801,3 +2801,26 @@ code and measurements below were not redone.
   --install-only` OK 2/2.
 
 ### Verdict: VERIFIED
+
+## Detector 1.9.0 — Step 1 (gap suite + baseline, before any change) — 2026-11-07 JST
+
+### Evidence
+- `fixtures/gaps/gaps.yaml` (sha256 `2beedbb8978e24161759864cb453f05138c648f180d60162272eeeb9a58f1091`),
+  40 items across gaps multistep / tool_meta / policy_tamper / quoted / long_doc, each with a
+  train and a holdout split and attack + benign near-miss; `long_doc` payloads are
+  model-catchable but rule-missable (rule score 0.0, hl-small prob 0.99/0.997) so they test the
+  ONNX window cap honestly. `src/containment/gap_eval.py` + `containment eval --suite gaps`.
+- Fresh benign batch `fixtures/benign/benign_v2_*` (41 security-adjacent near-misses, 11 land in
+  the holdout split), added before any detector change; provenance in `fixtures/benign/SOURCES.md`.
+- **Baseline gap eval (1.8.0 code), holdout attacks:**
+  - zero-dep: multistep 3/4, tool_meta 0/3, policy_tamper 3/3, quoted 1/1, long_doc payload 1/1
+    (caught by Stage 0, not the model). tool_meta train 0/3, multistep train 4/5.
+  - ONNX: multistep 4/4, tool_meta 3/3, policy_tamper 3/3, quoted 1/1 — but long_doc only passes
+    because Stage 0 catches those payloads; the end/straddle placements with the real
+    rule-missable payloads are the open ONNX-cap gap (measured after the fix).
+- **Baseline mutation + benign (new 263-file corpus), zero-dep:** all variants 90.2 % holdout;
+  benign FP 7/191 train, 5/72 holdout (= 12/263). New v2 FP causes to fix in step 2.6:
+  api_key_docs, data_retention, git_hooks, k8s_rbac, phishing_training (train);
+  password_reset_email (holdout). Pre-existing seen FPs unchanged.
+
+### Verdict: VERIFIED — gaps reproduced; tool_meta and multistep are the biggest zero-dep holes

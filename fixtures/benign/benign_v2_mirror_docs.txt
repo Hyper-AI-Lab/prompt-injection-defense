@@ -1,0 +1,1 @@
+The mirror job copies the public release artifacts to our CDN nightly. It touches only published files and never user content or conversation data.

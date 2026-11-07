@@ -1,0 +1,1 @@
+Data retention policy: we keep audit logs for 90 days, then delete them. To request earlier deletion, file a ticket; approvals are recorded in the ticket system.

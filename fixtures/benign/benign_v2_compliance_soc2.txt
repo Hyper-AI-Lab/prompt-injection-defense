@@ -1,0 +1,1 @@
+SOC2 control CC7.2 requires that we log access to production databases. The logging pipeline captures the actor, timestamp, and query category, not the row contents.

@@ -1,0 +1,1 @@
+Team norms: prefer threads, @mention sparingly, and summarize decisions in the channel topic. Share incident updates in #ops, not DMs, so everyone stays in the loop.

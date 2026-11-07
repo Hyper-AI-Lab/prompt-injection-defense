@@ -1,0 +1,1 @@
+Our firewall uses a default-deny posture: all inbound ports are blocked except those in allowlist.yaml. To expose a new service, add its port there and open a change request.

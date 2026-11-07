@@ -1,0 +1,1 @@
+Cost review: the ONNX inference box is the largest line item. We can move it to spot instances and cache results per document to cut latency and spend.

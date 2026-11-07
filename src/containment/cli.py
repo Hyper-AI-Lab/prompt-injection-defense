@@ -30,10 +30,25 @@ def _cmd_eval_mutations(args: argparse.Namespace, root: Path) -> int:
     return 0
 
 
+def _cmd_eval_gaps(args: argparse.Namespace, root: Path) -> int:
+    from containment.gap_eval import format_gap_report, run_gap_eval, summarize
+    from containment.ingest import default_ingest_cascade
+
+    outcomes = run_gap_eval(default_ingest_cascade(), fixtures_root=root)
+    if args.json:
+        print(json.dumps(summarize(outcomes), indent=2, sort_keys=True))
+    else:
+        print(format_gap_report(
+            outcomes, title="containment eval — suite=gaps — detector only (policy not used)"))
+    return 0
+
+
 def _cmd_eval(args: argparse.Namespace) -> int:
     root = Path(args.fixtures) if args.fixtures else default_fixtures_root()
     if args.suite == "mutations":
         return _cmd_eval_mutations(args, root)
+    if args.suite == "gaps":
+        return _cmd_eval_gaps(args, root)
     if args.suite == "fixtures":
         fixtures_root = root
     else:
@@ -201,7 +216,8 @@ def build_parser() -> argparse.ArgumentParser:
         default="fixtures",
         help=(
             "Suite name (default: fixtures). 'fixtures' loads fixtures/attacks and "
-            "fixtures/benign; 'mutations' runs the detector-only paraphrase eval."
+            "fixtures/benign; 'mutations' runs the detector-only paraphrase eval; "
+            "'gaps' runs the 1.9.0 blind-spot suite."
         ),
     )
     ev.add_argument(

@@ -1,0 +1,1 @@
+client.send(message) delivers the message to the channel you configured. Pass dry_run=True to preview without sending. Rate limits apply per workspace.

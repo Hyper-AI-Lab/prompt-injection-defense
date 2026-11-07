@@ -1,0 +1,1 @@
+Politica de seguridad: la configuracion por defecto deniega todo el trafico salvo el de la lista de permitidos. Para abrir un puerto, edite allowlist.yaml y abra un ticket.

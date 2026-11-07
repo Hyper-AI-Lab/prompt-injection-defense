@@ -1,0 +1,1 @@
+When adding a service account, grant the least privilege it needs and review the IAM policy quarterly. Avoid wildcard permissions; prefer scoped roles bound to a single resource.

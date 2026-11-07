@@ -1,0 +1,1 @@
+Consignes: utilisez des annotations de type et des fonctions courtes. Lisez les secrets depuis les variables d'environnement, jamais en dur dans le code.

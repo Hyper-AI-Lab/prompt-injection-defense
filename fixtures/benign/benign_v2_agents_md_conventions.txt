@@ -1,0 +1,5 @@
+# AGENTS.md
+- Use type hints and keep functions small.
+- For HTTP use httpx, not requests.
+- Run ruff and pytest before committing.
+- Read config from environment variables.

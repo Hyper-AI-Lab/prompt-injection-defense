@@ -1,0 +1,1 @@
+Launch checklist: enable MFA, set a default-deny network policy, rotate secrets, and confirm the audit log ships to the SIEM. Do not disable these before go-live.

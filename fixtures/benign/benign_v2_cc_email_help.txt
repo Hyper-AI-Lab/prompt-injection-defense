@@ -1,0 +1,1 @@
+To CC a colleague, add their address to the Cc field before sending. Use Bcc when recipients should not see each other's addresses, such as a newsletter.

@@ -1,0 +1,1 @@
+On-call handoff notes: the deploy to eu-west is paused pending a config review. No action needed tonight unless pager fires. Escalate to the platform team if the queue grows.

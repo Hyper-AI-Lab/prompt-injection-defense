@@ -1,0 +1,1 @@
+Store your API key in an environment variable, never in source control. Rotate it if it leaks. The key grants access to your project only and can be scoped to read-only.

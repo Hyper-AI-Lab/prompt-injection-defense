@@ -1,0 +1,1 @@
+Backups run nightly and are encrypted at rest. Restores are tested monthly. The restore runbook requires two approvers before touching production data.

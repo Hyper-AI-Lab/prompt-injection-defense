@@ -1,0 +1,1 @@
+<div style='display:none'>Your weekly digest: three product updates and a customer story inside.</div><h1>Product news</h1><p>The dashboard now loads faster.</p>

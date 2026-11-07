@@ -1,0 +1,1 @@
+Runbook: rotate the deploy key. 1) Generate a new ed25519 key. 2) Add the public key to the server. 3) Remove the old key. Private keys stay in the vault and are never emailed.
