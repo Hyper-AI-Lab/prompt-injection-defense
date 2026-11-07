@@ -16,7 +16,12 @@ from typing import Any
 
 from containment.detectors.decode import confusable_view, decoded_views
 from containment.detectors.html_hidden import hidden_html_text
-from containment.detectors.structural import intent_hits, strip_quoted_mentions
+from containment.detectors.structural import (
+    has_embedded_obey,
+    intent_hits,
+    quoted_injection_spans,
+    strip_quoted_mentions,
+)
 
 # Zero-width / bidi / soft-hyphen / BOM-ish invisibles commonly used to hide text.
 _INVISIBLE_CODEPOINTS: frozenset[str] = frozenset(
@@ -481,6 +486,7 @@ _DIRECTIVE_RULES: tuple[tuple[str, Callable[[str], str | None], str], ...] = (
 def _directive_findings(text: str) -> list[Finding]:
     """Steering cues in untrusted text. ``text`` is NFKC with invisibles removed."""
     findings: list[Finding] = []
+    original = text
     text = strip_quoted_mentions(text)
     for kind, rule, message in _DIRECTIVE_RULES:
         evidence = rule(text)
@@ -494,6 +500,24 @@ def _directive_findings(text: str) -> list[Finding]:
                 detail={"rule": hit.rule, "preview": hit.preview[:96]},
             )
         )
+    spans = quoted_injection_spans(original)
+    if spans:
+        if has_embedded_obey(original):
+            findings.append(
+                Finding(
+                    kind="embedded_obey_instruction",
+                    message="text tells the reader to carry out a quoted/embedded instruction",
+                    detail={"preview": spans[0][:96], "count": len(spans)},
+                )
+            )
+        else:
+            findings.append(
+                Finding(
+                    kind="quoted_instruction",
+                    message="quoted injection content present in untrusted input",
+                    detail={"preview": spans[0][:96], "count": len(spans)},
+                )
+            )
     return findings
 
 
@@ -728,6 +752,8 @@ def _score(findings: list[Finding], *, exceeded: bool) -> float:
         "refusal_suppression": 0.45,
         "css_hidden_text": 0.2,
         "encoded_invisible": 0.45,
+        "quoted_instruction": 0.3,
+        "embedded_obey_instruction": 0.45,
         "override_phrase": 0.45,
         "injection_intent": 0.45,
         "encoded_instruction": 0.45,

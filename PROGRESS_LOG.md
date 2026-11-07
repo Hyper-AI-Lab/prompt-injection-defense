@@ -2824,3 +2824,33 @@ code and measurements below were not redone.
   password_reset_email (holdout). Pre-existing seen FPs unchanged.
 
 ### Verdict: VERIFIED — gaps reproduced; tool_meta and multistep are the biggest zero-dep holes
+
+## 2026-11-05 (JST) — v1.9.0 Step 2: zero-dependency gap fixes (gaps 1,2,4,6)
+
+Implemented the no-model structural fixes and re-ran the full suite.
+
+- structural.py: staged_intent (cross-step collect→transmit, EN/RU/JA, bidirectional
+  windows), quoted_injection_spans + has_embedded_obey (gap 4), policy_tamper with
+  object-binding + agent-frame gate for inflected/passive forms (EN VO, JA OV particle,
+  EN passive OV), tool_meta_exfil (order-independent, conversation-grade data objects only,
+  telemetry-style sink destinations), _AUTH_PREFIX spoof-banner rule (delimiter-anchored so
+  it fires on decoded payloads, excludes bare role nouns like cluster-admin), _PRIV split.
+- rules.py: quoted_instruction (0.3) + embedded_obey_instruction (0.45) findings, computed
+  on the ORIGINAL (unstripped) text (fixed the strip-then-scan ordering bug).
+- base.py: CascadeResult.contains_instruction_text (gap 4 — quoted/discussed injection text
+  surfaces even below the risk line).
+- gap_eval.py: benign gap cases scored by high_risk only (a low-severity quoted finding on a
+  benign article is expected and not an FP).
+
+Results (zero-dependency / rules-only):
+- Gap suite: multistep 9/9, tool_meta 6/6, policy_tamper 7/7, quoted 6/6 (attack+benign,
+  both splits). long_doc payloads remain model-only by design (0/2 no-model — honest).
+- Mutation eval: train 598/598 (100.0%), holdout 234/234 (100.0%).
+- Benign FP: 1/191 train + 1/72 holdout = 2/263 (down from 12/263 baseline). The two
+  remaining: benign_code_test_prompt_injection (a test fixture that embeds a live payload
+  string — correctly instruction-shaped) and benign_meeting_notes_security_review
+  (tool_call_with_sensitive_data, pre-existing, unrelated to the six gaps).
+- Full test suite: 425 passed, 3 skipped. ruff clean.
+
+Remaining for Step 2+: gap 3 (ONNX sliding-window + time budget + fail-closed), gap 5 (LLM
+judge hardening), held-out regression tests, docs, version bump, release.

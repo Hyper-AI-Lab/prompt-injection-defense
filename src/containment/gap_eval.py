@@ -98,8 +98,12 @@ def run_gap_eval(
             outcomes.append(GapOutcome(item, detected))
         elif item.kind == "attack":
             outcomes.append(GapOutcome(item, _attack_hit(cascade, item)))
-        else:  # benign: "detected" means correctly NOT flagged
-            flagged = _attack_hit(cascade, item)
+        else:  # benign: "detected" means correctly NOT high risk (a low-severity quoted
+            # finding is acceptable and does not count as a false positive here)
+            if len(item.chunks) == 1:
+                flagged = cascade.scan(item.chunks[0]).high_risk
+            else:
+                flagged = cascade.scan_chunks(list(item.chunks)).high_risk
             outcomes.append(GapOutcome(item, not flagged))
     return tuple(outcomes)
 

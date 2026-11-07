@@ -52,6 +52,25 @@ class RiskSignal:
         object.__setattr__(self, "detail", MappingProxyType(dict(self.detail)))
 
 
+# Finding kinds that mean "this text carries an instruction aimed at the agent".
+_INSTRUCTION_FINDING_KINDS = frozenset(
+    {
+        "injection_intent",
+        "override_phrase",
+        "encoded_instruction",
+        "hidden_instruction",
+        "obfuscated_instruction",
+        "encoded_invisible",
+        "quoted_instruction",
+        "embedded_obey_instruction",
+        "tool_call_directive",
+        "secret_exfil_directive",
+        "agent_addressed_directive",
+        "css_hidden_text",
+    }
+)
+
+
 @dataclass(frozen=True, slots=True)
 class CascadeResult:
     """Aggregated cascade output — still never an authorization."""
@@ -74,6 +93,18 @@ class CascadeResult:
     def high_risk(self) -> bool:
         """True when the aggregate is malicious/suspicious/error or any score >= 0.4."""
         return self.aggregate_label in ("malicious", "suspicious", "error") or self.max_score >= 0.4
+
+    @property
+    def contains_instruction_text(self) -> bool:
+        """True when any signal found instruction-shaped content, even below the risk line.
+
+        Includes quoted/embedded injections in attack-discussion text (reported at low
+        severity): a host can use this to treat the content as carrying live instructions
+        regardless of the numeric score.
+        """
+        return any(
+            f.kind in _INSTRUCTION_FINDING_KINDS for s in self.signals for f in s.findings
+        )
 
 
 @runtime_checkable
