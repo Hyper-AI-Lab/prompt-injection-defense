@@ -2931,3 +2931,14 @@ CI failed: `evalsets/fresh/{holdout,train_pool}.jsonl` were never committed (rep
 `*.jsonl` gitignore); only MANIFEST.sha256 + SOURCES.md were in 40696a7. The local files still
 match that committed manifest byte for byte (sha256 300f8707… / eb1b5140…), so the freeze is
 intact; added a narrow gitignore exception and committed the data files.
+
+## 2026-11-15 23:30 (JST) — v1.10.0 released (GitHub only)
+
+Release: https://github.com/Hyper-AI-Lab/prompt-injection-defense/releases/tag/v1.10.0
+(tag on 698609d; CI 43722922729 gate + ml-eval green; publish 43724186873 build ok, PyPI job
+skipped; wheel + sdist attestations verified). Background re-verification after the final
+weights re-pin reproduced every number: fresh holdout zero-dep 919/1479 recall, 90/1001 FP,
+21.7 ms/KB; ONNX 1150/1479, 99/1001, 108 ms/KB; fixtures ASR 0 both modes (3/263 benign);
+mutations 100 %/100 % both modes; gaps all pass in ONNX mode, long-doc payloads still missed
+zero-dep. Shared skill pinned to v1.10.0; /workspace/.venvs/containment at 1.10.0 (doctor
+--install-only OK); pid-ml stage1.model PASS.
