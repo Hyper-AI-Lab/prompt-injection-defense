@@ -14,3 +14,6 @@ audit.jsonl
 
 # Generated eval cards / local prove-it outputs
 artifacts/
+
+# Frozen 1.10.0 eval set (hash-pinned by evalsets/fresh/MANIFEST.sha256)
+!evalsets/fresh/*.jsonl

@@ -2924,3 +2924,10 @@ Regression accepted: benign carriers 0 → 8 (zero-dep), 5 → 13 (ONNX) of 160.
 Release gate failed only on the placeholder-word scan (HTML attribute name in a regex). Fix:
 drop that attribute from the scorer's kept attributes → normalization changed → retrain weights
 (train pool only, same hyper-parameters) and re-verify all suites incl. the fresh holdout.
+
+## 2026-11-15 23:12 (JST) — v1.10.0: frozen set data files were untracked
+
+CI failed: `evalsets/fresh/{holdout,train_pool}.jsonl` were never committed (repo-wide
+`*.jsonl` gitignore); only MANIFEST.sha256 + SOURCES.md were in 40696a7. The local files still
+match that committed manifest byte for byte (sha256 300f8707… / eb1b5140…), so the freeze is
+intact; added a narrow gitignore exception and committed the data files.
