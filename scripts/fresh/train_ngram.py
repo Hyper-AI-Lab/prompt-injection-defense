@@ -46,7 +46,7 @@ def examples(bits: int, rng: random.Random) -> tuple[list[Counter], list[int], l
     g: list[str] = []
 
     def add_doc(text: str, label: int, group: str, payload: str | None = None,
-                max_neg: int = 6) -> None:
+                max_neg: int = 8) -> None:
         data = normalize(text)
         if not data:
             return
@@ -67,7 +67,7 @@ def examples(bits: int, rng: random.Random) -> tuple[list[Counter], list[int], l
                 negs.append(v)
                 continue
             ov = max(0, min(b, pspan[1]) - max(a, pspan[0]))
-            need = min(pspan[1] - pspan[0], 200)
+            need = min(pspan[1] - pspan[0], int(0.4 * (b - a)))
             if ov >= need:
                 X.append(v)
                 y.append(1)

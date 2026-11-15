@@ -2878,3 +2878,34 @@ All six blind spots closed. Released https://github.com/Hyper-AI-Lab/prompt-inje
 - Skill pin /home/box/agent-data/workflows/containment-untrusted-content/SKILL.md bumped
   v1.8.0 -> v1.9.0; /workspace/.venvs/containment reinstalled at 1.9.0; doctor install-only OK,
   ml venv stage1.model hl-small verified.
+
+## 2026-11-15 (JST) — v1.10.0 Step 0: fresh independent holdout frozen
+
+Plan: DETECTOR_1_10_0_PLAN.md (c. 2026-11-15). Built `evalsets/fresh/` from public sources
+(licenses checked, see evalsets/fresh/SOURCES.md) with a new deterministic builder
+(scripts/fresh/{fetch_sources,build_fresh}.py), frozen at 40696a7 (MANIFEST.sha256) before any
+detector change.
+- holdout: 1479 attacks (BIPIA test 415, InjecAgent 416, AgentDojo 455, deepset test 193) —
+  all holdout-only sources; 1001 benign (Wikipedia security EN/RU/JA/DE/FR/ES, OWASP cheat
+  sheets + LLM Top 10, NVD CVEs, MITRE ATT&CK, arXiv abstracts, CISA/NIST guidance, deepset
+  test benign, benign carriers + long benign docs).
+- train_pool: 3668 attacks (deepset train, gandalf, BIPIA train), 2196 benign.
+- Disjoint carrier families per split; benign items share the carriers; long docs ~15 KB.
+- Independence: none of the holdout attack sources is in the ONNX model's listed training data.
+Next: 1.9.0 baseline on the fresh holdout in both modes (running), then Step 1.
+
+## 2026-11-15 22:12 (JST) — v1.10.0: interrupted; resumed
+
+Interrupted during Step 1 fusion tuning (train-pool feature extraction had completed).
+1.9.0 baseline on the frozen fresh holdout (recorded before any detector change):
+- no-model: recall 437/1479 (29.5%), FP 180/1001 (18.0%), 20.6 ms/KB
+- ONNX:     recall 995/1479 (67.3%), FP 189/1001 (18.9%), 114 ms/KB
+Per source (attacks, no-model / ONNX): agentdojo 137/406 of 455; bipia 45/217 of 415;
+deepset 18/102 of 193; injecagent 237/270 of 416. Benign FPs are essentially the same in both
+modes (wikipedia 47, mitre 33, nvd 22-25, owasp 17+7, arxiv 20, long benign 34-35/40): they
+come from Stage 0 rules firing in expository security prose, so fixing Stage 0 fixes both.
+Note: 1.9.0 long-carrier attack "recall" (135/147) is inflated by filler FPs (34/40 long
+benign docs flagged).
+WIP so far: discourse.py (addressee-shift / imperative-spike / about-attacks cues), two-scale
+n-gram windows (512/256 + 256/128), out-of-fold doc scoring (scripts/fresh/oof_ngram.py),
+isolated zero-width chars scored as capped presence evidence, IntentHit carries its window.

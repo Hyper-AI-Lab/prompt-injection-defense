@@ -622,6 +622,7 @@ def scan_stage0(
                         "codepoint": code,
                         "category": unicodedata.category(ch),
                         "name": unicodedata.name(ch, "UNKNOWN"),
+                        "isolated": _isolated_zero_width(original, idx),
                     },
                 )
             )
@@ -729,6 +730,32 @@ def scan_stage0(
     )
 
 
+# Zero-width characters that real-world text (Wikipedia citation markers, emoji ZWJ sequences,
+# BOMs) carries between words. Isolated ones are presence evidence (capped like encodings);
+# inside a word ("ig\u200bnore") they are obfuscation and keep their full weight.
+_BOUNDARY_ZW = frozenset({"\u200b", "\u200c", "\u200d", "\u2060", "\ufeff"})
+
+
+def _isolated_zero_width(text: str, idx: int) -> bool:
+    if text[idx] not in _BOUNDARY_ZW:
+        return False
+    i = idx - 1
+    while i >= 0 and text[i] in _INVISIBLE_CODEPOINTS:
+        i -= 1
+    j = idx + 1
+    while j < len(text) and text[j] in _INVISIBLE_CODEPOINTS:
+        j += 1
+    prev_alnum = i >= 0 and text[i].isalnum()
+    next_alnum = j < len(text) and text[j].isalnum()
+    return not (prev_alnum and next_alnum)
+
+
+def _is_presence(finding: Finding) -> bool:
+    return finding.kind in _PRESENCE_KINDS or (
+        finding.kind == "invisible_char" and bool(finding.detail.get("isolated"))
+    )
+
+
 def _score(findings: list[Finding], *, exceeded: bool) -> float:
     if exceeded:
         return 1.0
@@ -766,7 +793,8 @@ def _score(findings: list[Finding], *, exceeded: bool) -> float:
     presence = 0.0
     for finding in findings:
         weight = weights.get(finding.kind, 0.2)
-        if finding.kind in _PRESENCE_KINDS:
+        if _is_presence(finding):
+            weight = min(weight, 0.15)
             # Many digests / blobs are still only "this text contains encodings".
             weight = max(0.0, min(weight, _PRESENCE_CAP - presence))
             presence += weight

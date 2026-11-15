@@ -383,6 +383,7 @@ class IntentHit:
     rule: str
     categories: frozenset[str]
     preview: str
+    window: str = ""  # the sentence window that fired (document text for staged_intent)
 
 
 def _positive(pattern: re.Pattern[str], text: str) -> bool:
@@ -737,7 +738,7 @@ def intent_hits(text: str, *, max_chars: int = 200_000) -> list[IntentHit]:
         cats = _categories(window)
         rule = _rule(cats)
         if rule is not None and rule not in hits:
-            hits[rule] = IntentHit(rule, frozenset(cats), window[:96])
+            hits[rule] = IntentHit(rule, frozenset(cats), window[:96], window)
     if "staged_intent" not in hits:
         staged = staged_intent(text)
         if staged is not None:
