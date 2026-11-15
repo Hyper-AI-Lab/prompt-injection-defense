@@ -119,3 +119,64 @@ ONNX benign FPs are the classifier's own calls on hard near-misses.
 Train recall of 100 % reflects tuning on train; read the holdout column. Latency (8 vCPU,
 loaded box): zero-dep 11–23 ms/KB; ONNX hl-small ≈ 90 ms for 1 KB, ≈ 145–155 ms/KB above.
 No detector catches every injection — see `docs/THREAT_MODEL.md`.
+
+### 1.10.0 — fresh independent holdout
+
+A new held-out set (`containment eval --suite fresh`, `evalsets/fresh/`, provenance and
+licences in `SOURCES.md`) was built by a different generator from public benchmarks and
+security prose, and frozen (`MANIFEST.sha256`) **before** any 1.10.0 detector change. All
+tuning used the train pool, mostly out of fold. The ONNX model's training data doesn't include
+any holdout attack source.
+
+| attacks by source (recall) | zero-dep 1.9.0 | zero-dep 1.10.0 | ONNX 1.9.0 | ONNX 1.10.0 |
+| --- | --- | --- | --- | --- |
+| agentdojo | 137/455 | **295/455** | 406/455 | **422/455** |
+| bipia | 45/415 | **262/415** | 217/415 | **302/415** |
+| deepset | 18/193 | **114/193** | 102/193 | **147/193** |
+| injecagent | 237/416 | **248/416** | 270/416 | **279/416** |
+| **all attacks** | 437/1479 | **919/1479** | 995/1479 | **1150/1479** |
+
+| benign by source (flagged) | zero-dep 1.9.0 | zero-dep 1.10.0 | ONNX 1.9.0 | ONNX 1.10.0 |
+| --- | --- | --- | --- | --- |
+| wikipedia | 47/207 | 10/207 | 47/207 | 10/207 |
+| mitre_attack | 33/163 | 13/163 | 33/163 | 13/163 |
+| nvd_cve | 22/139 | 8/139 | 25/139 | 11/139 |
+| arxiv_abstract | 20/150 | 4/150 | 20/150 | 4/150 |
+| owasp_cheatsheet | 17/70 | 14/70 | 17/70 | 14/70 |
+| owasp_llm_top10 | 7/12 | 3/12 | 7/12 | 3/12 |
+| gov_guidance | 0/4 | 1/4 | 0/4 | 1/4 |
+| deepset | 0/56 | 0/56 | 0/56 | 0/56 |
+| long_benign | 34/40 | 29/40 | 35/40 | 30/40 |
+| carrier_benign | 0/160 | 8/160 | 5/160 | 13/160 |
+| **all benign** | 180/1001 | **90/1001** | 189/1001 | **99/1001** |
+
+| attacks by carrier | zero-dep 1.9.0 | zero-dep 1.10.0 | ONNX 1.9.0 | ONNX 1.10.0 |
+| --- | --- | --- | --- | --- |
+| bare | 99/444 | 227/444 | 234/444 | 286/444 |
+| email | 49/227 | 166/227 | 162/227 | 197/227 |
+| html | 41/210 | 116/210 | 155/210 | 175/210 |
+| json_tool | 59/229 | 130/229 | 175/229 | 184/229 |
+| chat | 54/222 | 151/222 | 127/222 | 169/222 |
+| long | 135/147 | 129/147 | 142/147 | 139/147 |
+
+**Long documents, honestly:** each long doc concatenates 8 security-prose chunks around a
+planted payload. The raw `long` row mostly measures filler false positives. With the payload
+removed, the filler alone is flagged in 134/147 docs (1.9.0) and 120/147 (1.10.0), zero-dep. So
+zero-dep detections attributable to the payload went from **1** to **9** of 147. Among docs
+with clean filler, 9/27 payloads are caught (1.9.0: 1/13). The gap suite's two long-doc
+payloads are still missed in zero-dep mode and caught by ONNX.
+
+Old suites: mutation recall is 100 % / 100 % (train/holdout) in both modes, as in 1.9.0.
+Mutation-benign flags: zero-dep 3/263 (1.9.0: 2), ONNX 8/263 (1.9.0: 8). Fixture suite: ASR 0
+with policy on, benign flagged 3/263 in both modes (1.9.0: 2 in both). The newly flagged item
+everywhere is an IT password-reset email the learned scorer rates 0.87.
+
+Latency (8 vCPU, loaded box): zero-dep 22 ms/KB on the fresh holdout (1.9.0: 21). The
+learned scorer plus discourse adds ~1.25 ms/KB, 0.3 s for a 200 KB document. ONNX ≈ 111 ms/KB.
+
+Regressions we accept: benign *carriers* (emails/chats with ordinary human-addressed
+requests) went from 0 to 8/160 flagged zero-dep and from 5 to 13/160 with ONNX. The learned
+scorer cannot always tell a human-addressed request from an agent-addressed one.
+BIPIA-text and InjecAgent-base attacks look like ordinary requests that are injections only
+because of where they sit, which caps recall on those sources.
+No detector catches every injection — see `docs/THREAT_MODEL.md`.

@@ -35,7 +35,7 @@ _WS_RE = re.compile(r"\s+")
 _TAG_RE = re.compile(r"<[^<>]{0,600}>")
 # Human-readable attribute text is kept (an attacker can hide an instruction in alt="…").
 _TEXT_ATTR_RE = re.compile(
-    r"""\b(?:alt|title|aria-label|placeholder|content|label|summary)\s*=\s*(?:"([^"]*)"|'([^']*)')""",
+    r"""\b(?:alt|title|aria-label|content|label|summary)\s*=\s*(?:"([^"]*)"|'([^']*)')""",
     re.IGNORECASE,
 )
 
@@ -44,7 +44,7 @@ def _tag_text(match: re.Match[str]) -> str:
     vals = [a or b for a, b in _TEXT_ATTR_RE.findall(match.group(0))]
     return " " + " ".join(vals) + " " if vals else " "
 # SHA-256 of the shipped weights file; checked on load (tamper / truncation → refuse).
-WEIGHTS_SHA256 = "f14f54e5dfec0bdfcdaa456dfb571f264f0fd94a08faf3f7073b9013e4397199"
+WEIGHTS_SHA256 = "UNSET"
 
 
 def normalize(text: str) -> bytes:

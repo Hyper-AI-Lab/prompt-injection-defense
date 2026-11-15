@@ -16,9 +16,9 @@ import json
 import random
 
 import numpy as np
+import train_ngram as T
 from sklearn.linear_model import LogisticRegression
 
-import train_ngram as T
 from containment.detectors.ngram_scorer import NgramScorer
 from containment.fresh_eval import load_fresh
 

@@ -511,3 +511,33 @@ design does not classify neutral-looking prose). Benign false positives in ONNX 
 classifier's own calls on security-adjacent near-misses (e.g. phishing-training and
 security-checklist docs). Zero-dep Stage 0 is ~5–10x slower than 1.7.2 (~16–32 ms/KB on a
 loaded box); ONNX whole-document scanning is ~105–165 ms/KB.
+
+### 1.10.0 — independent measurement, zero-dep learned scorer, discourse fusion
+- **Measure first.** A fresh holdout from licensed public sources (BIPIA, InjecAgent,
+  AgentDojo, deepset; security prose from Wikipedia, OWASP, NVD, MITRE, arXiv, CISA/NIST) was
+  built by a new generator and frozen before any change. Attack sources are split by source
+  (holdout-only vs train-only), and carrier templates don't overlap between splits, so neither
+  the carrier nor the length is a usable signal. The holdout is evaluated once at the end and
+  never inspected item by item.
+- **Learned scorer, zero dependency.** A hashed byte 3–5-gram plus word 1–2-gram logistic
+  model (liblinear offline, int8 weights, 2^17 buckets, 128 KB) beats bigger options at this
+  size with no runtime dependencies. It covers the whole document through prefix sums at two
+  window scales. The half scale exists because a short payload in a 512-byte window was
+  diluted by filler (train-pool OOF long-doc recall 82 → 175 / 353 at p ≥ 0.5). Markup tags
+  are stripped in normalization (train == inference) after a benign HTML email scored 0.99 on
+  styling tokens; human-readable attributes (alt/title/aria-label…) are kept.
+- **Fusion on train pool only.** Thresholds came from 5-fold group OOF document scoring with
+  the exact quantized runtime model: high 0.85 (0.90 under 150 B; no lone score under 48 B),
+  mid 0.70 with discourse corroboration, shift path 0.30. Train-pool OOF: recall 1675 → 2604 /
+  3668, FP 296 → 134 / 2196. Requiring an agent cue for the high path would have cut 6 FPs at
+  ~7 % recall cost, so it was rejected (recall first).
+- **Why most ONNX FPs disappeared without touching the model.** On the fresh holdout, ONNX-mode
+  FPs on security prose were almost all Stage-0 rule hits in expository sentences. Strong-model
+  FPs were a handful, and demoting them would have risked recall, so they were kept. The fix is
+  the `described_intent` demotion plus instruction-only corroboration in the mid zone.
+- **Declarative injections guard the demotion.** The first demotion lost 15 held-out mutation
+  variants: authority banners, approval claims, "the assistant should …", and RU/JA
+  imperatives. These were fixed in the cue grammar and with non-demotable rules and a 250-byte
+  floor, then verified on the old suites (100 % / 100 % again). This was not tuned on the fresh
+  holdout.
+

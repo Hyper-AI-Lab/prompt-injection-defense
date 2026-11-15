@@ -63,8 +63,8 @@ is influenced by injected instructions.
 language has unbounded ways to phrase an instruction; attackers can adapt to any fixed
 detector (rules, classifier or LLM judge). The detector cascade is built to be
 wording-independent and to catch as much as it can — on the held-out paraphrase eval it
-flags 100 % of held-out variants with no dependencies and 100 % with the ONNX layer as of
-`docs/EVAL_CARD.md`) — but the remaining misses are real, and so are false positives.
+flags 100 % of held-out variants with no dependencies and 100 % with the ONNX layer, and on
+the independent 1.10.0 public-benchmark holdout 62 % / 78 % (see `docs/EVAL_CARD.md`) — but the remaining misses are real, and so are false positives.
 
 The guarantee comes from **policy and capability containment**: untrusted content is
 labeled untrusted, the model only *proposes* actions, and the broker denies privileged
@@ -85,6 +85,17 @@ by itself authorize a privileged action.
   wall-clock budget (`CONTAINMENT_STAGE1_BUDGET_S`, default 45 s) and fails closed if the
   budget is exhausted; the LLM judge itself reads untrusted text and can
   be steered (it can only raise risk).
+- Measured on an independent, frozen public-benchmark holdout (1.10.0, `docs/EVAL_CARD.md`),
+  recall is 62 % with no dependencies and 78 % with the ONNX layer, and 9–10 % of
+  security-heavy benign documents are flagged. Attacks that read as ordinary requests and are
+  injections only by placement (BIPIA-style "also include …", InjecAgent base) are the main
+  misses. Planted payloads in long, security-dense documents are rarely *attributable*
+  detections in zero-dep mode, because the surrounding prose is itself often flagged. The
+  zero-dep learned scorer can mistake human-addressed requests (password-reset or order
+  emails) for agent-addressed ones. Expository rule hits (description, not instruction) are
+  reported at low severity (`described_intent`), so a crafted declarative injection in a long
+  expository document can stay below the risk line. It still sets
+  `contains_instruction_text`.
 - Does not replace OS process isolation. In-package interfaces cover vault-shaped
   secrets (`SecretProvider`), audit export (`AuditShipper`), rate gates, and an
   optional resolve-pin forward proxy; residual remains if the host skips

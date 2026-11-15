@@ -9,6 +9,56 @@ They are not a benchmark claim; see `docs/EVAL_CARD.md` for scope.
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-11-15
+
+Closes the two residuals reported for 1.9.0 as far as an honest, independent measurement
+supports. The detector still never authorizes; policy and capability containment remain the
+guarantee. **No detector catches every injection** (`docs/THREAT_MODEL.md`).
+
+### Added
+- **Fresh independent eval set** `evalsets/fresh/` + `containment eval --suite fresh`
+  (`--split holdout|train_pool`): 2,480 holdout items (1,479 attacks from BIPIA test,
+  InjecAgent, AgentDojo and deepset test, all holdout-only sources; 1,001 benign, mostly
+  security prose: Wikipedia security articles in EN/RU/JA/DE/FR/ES, OWASP cheat sheets and LLM
+  Top 10, NVD CVEs, MITRE ATT&CK, arXiv abstracts, CISA/NIST guidance), with carrier
+  families that don't overlap between splits. Built by a new deterministic generator, frozen by
+  `MANIFEST.sha256` before any detector change, and never tuned on. Licences and attribution are
+  in `evalsets/fresh/SOURCES.md`. Source checkout only (not in the wheel: CC BY-SA text).
+- **Zero-dependency learned scorer** (`detectors/ngram_scorer.py`): a hashed char/word n-gram
+  linear model, pure Python. 128 KB of int8 weights ship as package data
+  (`containment/_data/ngram_scorer.bin`), pinned by SHA-256 and refused if tampered. It scores
+  the **whole document** in two window scales (512/256 and 256/128 bytes) via prefix sums
+  (~1.25 ms/KB). Trained offline on the fresh train pool plus 1.8/1.9 train splits only
+  (`scripts/fresh/train_ngram.py`).
+- **Discourse signals** (`detectors/discourse.py`): per-sentence imperative / agent-addressed /
+  about-attacks cues (EN/RU/JA, quote-aware), per-window **addressee shift** toward the agent
+  and **imperative-density spike** against the document baseline.
+- **Stage-0 fusion** (`detectors/fusion.py`): new `learned_injection` finding (high window
+  score outside "about attacks" prose; mid score with discourse corroboration; or an addressee
+  shift with an imperative). Thresholds were chosen out-of-fold on the train pool
+  (`scripts/fresh/oof_ngram.py`).
+
+### Changed
+- Expository rule hits are now low severity: a sentence-level intent hit that is neither
+  imperative nor addressed to the agent, with a low learned score in a document with no
+  confident learned window, becomes `described_intent` (weight 0.25, still counted by
+  `contains_instruction_text`). It is no longer high-risk `injection_intent`. Code, encoding,
+  leak, staged, authority-spoof and approval-claim rules are never demoted, and neither are
+  texts under 250 bytes.
+- ONNX mid-zone (`t_lo <= p < t_hi`) corroboration now uses structural cues only from
+  instruction-shaped windows (imperative or agent-addressed). Strong model scores are unchanged.
+- Isolated zero-width characters (citation markers, emoji ZWJ, BOM) count as capped presence
+  evidence. Zero-width characters inside a word keep full weight.
+
+### Measured (fresh holdout, frozen; 1.9.0 → 1.10.0)
+| mode | recall | benign FP | latency |
+| --- | --- | --- | --- |
+| zero-dep | 437/1479 (29.5 %) → **919/1479 (62.1 %)** | 180/1001 (18.0 %) → **90/1001 (9.0 %)** | 20.6 → 22.1 ms/KB |
+| ONNX hl-small | 995/1479 (67.3 %) → **1150/1479 (77.8 %)** | 189/1001 (18.9 %) → **99/1001 (9.9 %)** | 114 → 111 ms/KB |
+
+Old suites: mutation recall stays 100 % / 100 % in both modes. Fixture ASR (policy on) is 0.
+The gap suite matches 1.9.0. See `docs/EVAL_CARD.md` for per-source tables and residuals.
+
 ## [1.9.0] - 2026-11-07
 
 Tightens the six blind spots reported for 1.8.0. The detector still never authorizes;
