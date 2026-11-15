@@ -746,11 +746,23 @@ def intent_hits(text: str, *, max_chars: int = 200_000) -> list[IntentHit]:
     return list(hits.values())
 
 
-def weak_signal(text: str, *, max_chars: int = 200_000) -> frozenset[str]:
-    """Union of categories over the text (for fusion with an ML score)."""
+def weak_signal(
+    text: str, *, max_chars: int = 200_000, instruction_only: bool = False
+) -> frozenset[str]:
+    """Union of categories over the text (for fusion with an ML score).
+
+    ``instruction_only`` keeps only windows that read as instructions (imperative or addressed
+    to the agent), so security prose that merely *mentions* overrides, privileges or secrets
+    does not corroborate a borderline classifier score.
+    """
+    from containment.detectors.discourse import window_has_cues
+
     out: set[str] = set()
     for window in _windows(text[:max_chars]):
-        out |= _categories(window[:4000])
+        cats = _categories(window[:4000])
+        if cats and instruction_only and not any(window_has_cues(window[:4000])):
+            continue
+        out |= cats
     return frozenset(out)
 
 

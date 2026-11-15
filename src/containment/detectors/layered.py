@@ -5,7 +5,8 @@ de-obfuscated and CSS-hidden text), so an instruction is scored in the form a mo
 read it. Fusion (thresholds tuned on the mutation-eval **train** split only):
 
 * ``p >= t_hi``                                  → suspicious/malicious
-* ``t_lo <= p < t_hi`` and a structural action cue → suspicious
+* ``t_lo <= p < t_hi`` and a structural action cue from an *instruction-shaped* window
+  (imperative or addressed to the agent; 1.10.0) → suspicious
 * otherwise                                       → benign / inconclusive
 
 Stage-0 rules still score independently in the cascade; this layer only adds recall.
@@ -106,7 +107,9 @@ class LayeredDetector:
             exhausted = exhausted or rex
             if exhausted:
                 break
-        cues = weak_signal("\n\n".join(readings)[:_MAX_CUE_CHARS])
+        # Mid-confidence corroboration must come from instruction-shaped windows: security
+        # prose that merely mentions overrides/privileges/secrets does not corroborate (1.10.0).
+        cues = weak_signal("\n\n".join(readings)[:_MAX_CUE_CHARS], instruction_only=True)
         if exhausted:
             score = round(min(1.0, max(self._score(p, cues), _BUDGET_FAIL_FLOOR)), 4)
             return RiskSignal(

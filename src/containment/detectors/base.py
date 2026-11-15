@@ -62,6 +62,8 @@ _INSTRUCTION_FINDING_KINDS = frozenset(
         "obfuscated_instruction",
         "encoded_invisible",
         "quoted_instruction",
+        "described_intent",
+        "learned_injection",
         "embedded_obey_instruction",
         "tool_call_directive",
         "secret_exfil_directive",

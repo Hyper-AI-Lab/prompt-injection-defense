@@ -15,6 +15,7 @@ from types import MappingProxyType
 from typing import Any
 
 from containment.detectors.decode import confusable_view, decoded_views
+from containment.detectors.fusion import is_descriptive, learned_scan
 from containment.detectors.html_hidden import hidden_html_text
 from containment.detectors.structural import (
     has_embedded_obey,
@@ -483,8 +484,12 @@ _DIRECTIVE_RULES: tuple[tuple[str, Callable[[str], str | None], str], ...] = (
 )
 
 
-def _directive_findings(text: str) -> list[Finding]:
-    """Steering cues in untrusted text. ``text`` is NFKC with invisibles removed."""
+def _directive_findings(text: str, *, learned: bool = False) -> list[Finding]:
+    """Steering cues in untrusted text. ``text`` is NFKC with invisibles removed.
+
+    ``learned=True`` (the main text, not alternate views) adds the zero-dependency learned
+    scorer over the whole document and lets it mark expository rule hits as low severity.
+    """
     findings: list[Finding] = []
     original = text
     text = strip_quoted_mentions(text)
@@ -492,12 +497,40 @@ def _directive_findings(text: str) -> list[Finding]:
         evidence = rule(text)
         if evidence is not None:
             findings.append(Finding(kind=kind, message=message, detail={"preview": evidence[:96]}))
+    lres = learned_scan(original) if learned else None
+    described: list[str] = []
     for hit in intent_hits(text):
+        if lres is not None and is_descriptive(hit, lres):
+            described.append(hit.rule)
+            continue
         findings.append(
             Finding(
                 kind="injection_intent",
                 message=f"instruction intent: {hit.rule}",
                 detail={"rule": hit.rule, "preview": hit.preview[:96]},
+            )
+        )
+    if described:
+        findings.append(
+            Finding(
+                kind="described_intent",
+                message="instruction-shaped wording in descriptive (non-imperative) prose",
+                detail={"rules": sorted(described)},
+            )
+        )
+    if lres is not None and lres.hits:
+        top = lres.hits[0]
+        findings.append(
+            Finding(
+                kind="learned_injection",
+                message="learned scorer: injection-like passage"
+                + (f" ({', '.join(top.signals)})" if top.signals else ""),
+                detail={
+                    "probability": round(top.probability, 4),
+                    "windows": len(lres.hits),
+                    "signals": list(top.signals),
+                    "preview": top.preview,
+                },
             )
         )
     spans = quoted_injection_spans(original)
@@ -680,7 +713,7 @@ def scan_stage0(
         if ch in ("\t", "\n", "\r")
         or (ch not in _INVISIBLE_CODEPOINTS and not _is_suspicious_control(ch))
     )
-    findings.extend(_directive_findings(visible))
+    findings.extend(_directive_findings(visible, learned=True))
     views = _views(normalized)
     seen: set[str] = set()
     for source, view in views:
@@ -780,6 +813,8 @@ def _score(findings: list[Finding], *, exceeded: bool) -> float:
         "css_hidden_text": 0.2,
         "encoded_invisible": 0.45,
         "quoted_instruction": 0.3,
+        "described_intent": 0.25,
+        "learned_injection": 0.45,
         "embedded_obey_instruction": 0.45,
         "override_phrase": 0.45,
         "injection_intent": 0.45,

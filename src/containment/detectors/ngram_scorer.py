@@ -30,13 +30,27 @@ MAGIC = b"CNGS1\x00"
 _HEADER = struct.Struct("<6sBBBBIIff")
 _WORD_RE = re.compile(rb"[a-z0-9']+")
 _WS_RE = re.compile(r"\s+")
+# Markup is not language: tags/attributes are replaced by a space so only text content
+# (including CSS-hidden text) is scored and styling never looks like an attack.
+_TAG_RE = re.compile(r"<[^<>]{0,600}>")
+# Human-readable attribute text is kept (an attacker can hide an instruction in alt="…").
+_TEXT_ATTR_RE = re.compile(
+    r"""\b(?:alt|title|aria-label|placeholder|content|label|summary)\s*=\s*(?:"([^"]*)"|'([^']*)')""",
+    re.IGNORECASE,
+)
+
+
+def _tag_text(match: re.Match[str]) -> str:
+    vals = [a or b for a, b in _TEXT_ATTR_RE.findall(match.group(0))]
+    return " " + " ".join(vals) + " " if vals else " "
 # SHA-256 of the shipped weights file; checked on load (tamper / truncation → refuse).
-WEIGHTS_SHA256 = "UNSET"
+WEIGHTS_SHA256 = "f14f54e5dfec0bdfcdaa456dfb571f264f0fd94a08faf3f7073b9013e4397199"
 
 
 def normalize(text: str) -> bytes:
-    """NFKC, lower-case, collapse whitespace, UTF-8 — identical at train and inference."""
-    return _WS_RE.sub(" ", unicodedata.normalize("NFKC", text).lower()).strip().encode("utf-8")
+    """NFKC, strip markup tags, lower-case, collapse whitespace, UTF-8 (train == inference)."""
+    text = _TAG_RE.sub(_tag_text, unicodedata.normalize("NFKC", text))
+    return _WS_RE.sub(" ", text.lower()).strip().encode("utf-8")
 
 
 def gram_positions(data: bytes, bits: int, nmin: int, nmax: int,
@@ -132,6 +146,20 @@ class NgramScorer:
 
     def score(self, text: str) -> list[WindowScore]:
         return self.score_bytes(normalize(text))
+
+    def score_text(self, text: str) -> tuple[str, list[tuple[int, int, float]]]:
+        """Normalized text and its windows as (char start, char end, probability)."""
+        data = normalize(text)
+        norm = data.decode("utf-8")
+        b2c = [0] * (len(data) + 1)
+        i = 0
+        for c, ch in enumerate(norm):
+            n = len(ch.encode("utf-8"))
+            for k in range(n):
+                b2c[i + k] = c
+            i += n
+        b2c[len(data)] = len(norm)
+        return norm, [(b2c[w.start], b2c[w.end], w.probability) for w in self.score_bytes(data)]
 
 
 @lru_cache(maxsize=1)

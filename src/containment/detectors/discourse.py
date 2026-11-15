@@ -16,6 +16,7 @@ Zero-dependency. Used to corroborate learned / model scores (never to authorize)
 from __future__ import annotations
 
 import re
+from bisect import bisect_left
 from dataclasses import dataclass
 from statistics import median
 
@@ -35,6 +36,9 @@ _VERBS = (
     "rate|review|check|verify|access|obtain|provide"
 )
 _IMP_EN = re.compile(_LEAD + rf"(?:{_VERBS})\b", re.IGNORECASE)
+# Imperative after a leading clause or label: "Before answering, disable …", "Note: send …".
+_IMP_EN_CLAUSE = re.compile(rf"^[^,.;:]{{0,80}}[,:]\s*(?:please\s+|then\s+|now\s+)?(?:{_VERBS})\b",
+                            re.IGNORECASE)
 _IMP_EN2 = re.compile(
     r"\b(?:you\s+(?:must|should|need\s+to|have\s+to|are\s+(?:to|required\s+to)|will\s+now)|"
     r"make\s+sure\s+(?:to|you)|be\s+sure\s+to|it\s+is\s+(?:essential|mandatory|required)\s+that\s+you|"
@@ -53,7 +57,7 @@ _AGENT = re.compile(
     r"(?:ai|llm)\s+(?:assistant|agent|model)s?\b|assistant[,:]|attention\s+(?:ai|assistant|agent|"
     r"model|llm)|whoever\s+is\s+(?:reading|processing|summari[sz]ing|handling)|"
     r"as\s+the\s+(?:reader|assistant|model|agent)\s+of|to\s+the\s+(?:ai|assistant|model|agent)\b|"
-    r"before\s+you\s+(?:answer|respond|reply|summari[sz]e|continue|proceed|finish|solve)|"
+    r"before\s+(?:you\s+)?(?:answer|respond|repl[yi]|summari[sz]e|continu|proceed|finish|solv)\w*|"
     r"when\s+(?:you\s+)?(?:summari[sz]e|summari[sz]ing|answering|responding|processing)|"
     r"your\s+(?:instructions|task|system\s+prompt|guidelines|rules|previous|original\s+task)|"
     r"the\s+task\s+(?:that\s+)?i\s+gave\s+you|important\s+message\s+(?:from\s+me\s+)?to\s+you|"
@@ -97,8 +101,7 @@ class SentenceCues:
 def sentence_cues(text: str) -> list[SentenceCues]:
     out = []
     for start, s in sentences(text):
-        imp = bool(_IMP_EN.search(s) or _IMP_EN2.search(s) or _IMP_RU.search(s)
-                   or _IMP_JA.search(s))
+        imp = any(rx.search(s) for rx in (_IMP_EN, _IMP_EN_CLAUSE, _IMP_EN2, _IMP_RU, _IMP_JA))
         out.append(SentenceCues(start, imp, bool(_AGENT.search(s) or _AGENT_XX.search(s)),
                                 bool(_ABOUT.search(s))))
     return out
@@ -116,27 +119,48 @@ class WindowDiscourse:
 def window_discourse(
     cues: list[SentenceCues], spans: list[tuple[int, int]]
 ) -> list[WindowDiscourse]:
-    """Per-window discourse summary; ``spans`` are character offsets into the same text."""
+    """Per-window discourse summary; ``spans`` are character offsets into the same text.
+
+    O(windows + sentences): sentences are assigned to windows by start offset via prefix sums.
+    """
+    starts = [c.start for c in cues]
+    pre_imp, pre_about, pre_agent = [0], [0], [0]
+    for c in cues:
+        pre_imp.append(pre_imp[-1] + c.imperative)
+        pre_about.append(pre_about[-1] + c.about)
+        pre_agent.append(pre_agent[-1] + c.agent)
     per = []
     for a, b in spans:
-        cs = [c for c in cues if a <= c.start < b]
-        n = max(1, len(cs))
-        per.append((cs, sum(c.imperative for c in cs) / n, sum(c.about for c in cs) / n,
-                    any(c.agent for c in cs)))
-    n_agent_total = sum(c.agent for c in cues)
-    dens = [p[1] for p in per]
-    med = median(dens) if dens else 0.0
+        i, j = bisect_left(starts, a), bisect_left(starts, b)
+        n = max(1, j - i)
+        per.append(((pre_imp[j] - pre_imp[i]) / n, (pre_about[j] - pre_about[i]) / n,
+                    pre_agent[j] - pre_agent[i]))
+    total_agent = pre_agent[-1]
+    med = median(p[0] for p in per) if per else 0.0
     out = []
-    for cs, d_imp, d_about, agent in per:
-        own_agent = sum(c.agent for c in cs)
+    for d_imp, d_about, own_agent in per:
         # Shift: this window addresses the agent while the rest of the document essentially
-        # does not (≤ 1 other agent-addressed sentence). Single-window documents qualify if
-        # they are not predominantly "about attacks".
-        rest = n_agent_total - own_agent
-        shift = agent and (rest <= 1 if len(per) > 1 else d_about < 0.5)
+        # does not (<= 1 other agent-addressed sentence). A single-window document qualifies
+        # when it is not predominantly "about attacks".
+        shift = own_agent > 0 and (
+            total_agent - own_agent <= 1 if len(per) > 1 else d_about < 0.5
+        )
         spike = len(per) >= 3 and d_imp >= 0.5 and d_imp >= med + 0.34
-        out.append(WindowDiscourse(agent, d_imp, d_about, shift, spike))
+        out.append(WindowDiscourse(own_agent > 0, d_imp, d_about, shift, spike))
     return out
 
 
-__all__ = ["SentenceCues", "WindowDiscourse", "sentence_cues", "sentences", "window_discourse"]
+def window_has_cues(window: str) -> tuple[bool, bool]:
+    """(imperative, agent-addressed) anywhere in ``window``."""
+    cues = sentence_cues(window)
+    return any(c.imperative for c in cues), any(c.agent for c in cues)
+
+
+__all__ = [
+    "SentenceCues",
+    "WindowDiscourse",
+    "sentence_cues",
+    "sentences",
+    "window_discourse",
+    "window_has_cues",
+]
