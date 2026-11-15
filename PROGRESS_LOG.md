@@ -2909,3 +2909,18 @@ benign docs flagged).
 WIP so far: discourse.py (addressee-shift / imperative-spike / about-attacks cues), two-scale
 n-gram windows (512/256 + 256/128), out-of-fold doc scoring (scripts/fresh/oof_ngram.py),
 isolated zero-width chars scored as capped presence evidence, IntentHit carries its window.
+
+## 2026-11-15 23:02 (JST) — v1.10.0: interrupted again; resumed
+
+State at interruption: Steps 1–2 implemented and committed (d958bd0, cb1e93f). Final fresh
+holdout measured once (frozen set, never tuned on), 1.9.0 → 1.10.0:
+- zero-dep: recall 437 → 919 / 1479 (29.5 % → 62.1 %), FP 180 → 90 / 1001 (18.0 % → 9.0 %),
+  20.6 → 22.1 ms/KB
+- ONNX:     recall 995 → 1150 / 1479 (67.3 % → 77.8 %), FP 189 → 99 / 1001 (18.9 % → 9.9 %)
+Old suites: mutations 100 %/100 % both modes; fixtures ASR 0, benign flagged 3/263 both modes
+(1.9.0: 2; new one is an IT password-reset email); gaps unchanged (long-doc payloads still
+missed zero-dep). Long-doc attribution (zero-dep): payload-attributable detections 1 → 9/147.
+Regression accepted: benign carriers 0 → 8 (zero-dep), 5 → 13 (ONNX) of 160.
+Release gate failed only on the placeholder-word scan (HTML attribute name in a regex). Fix:
+drop that attribute from the scorer's kept attributes → normalization changed → retrain weights
+(train pool only, same hyper-parameters) and re-verify all suites incl. the fresh holdout.
