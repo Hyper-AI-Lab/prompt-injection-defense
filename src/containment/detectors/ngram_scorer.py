@@ -44,7 +44,7 @@ def _tag_text(match: re.Match[str]) -> str:
     vals = [a or b for a, b in _TEXT_ATTR_RE.findall(match.group(0))]
     return " " + " ".join(vals) + " " if vals else " "
 # SHA-256 of the shipped weights file; checked on load (tamper / truncation → refuse).
-WEIGHTS_SHA256 = "UNSET"
+WEIGHTS_SHA256 = "f14f54e5dfec0bdfcdaa456dfb571f264f0fd94a08faf3f7073b9013e4397199"
 
 
 def normalize(text: str) -> bytes:
