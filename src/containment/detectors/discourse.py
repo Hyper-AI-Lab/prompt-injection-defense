@@ -51,7 +51,12 @@ _IMP_RU = re.compile(
     r"сообщите|скопируй|скопируйте|загрузи|загрузите|покажи|покажите|выведи|забудь|не\s+\w+й)\b",
     re.IGNORECASE,
 )
-_IMP_JA = re.compile(r"(?:てください|でください|しなさい|せよ|すること|してくれ|ください。)")
+# RU imperative by ending, sentence-initial ("Делай …", "Загрузите …").
+_IMP_RU2 = re.compile(r"^\W*[а-яё]{2,}(?:ай|яй|уй|ей|ите|айте|яйте|йте|ись|ься)\b", re.IGNORECASE)
+_IMP_JA = re.compile(
+    r"(?:てください|でください|しなさい|せよ|すること|ないこと|してくれ|ください。|しろ|するな|"
+    r"(?:して|って|いて|んで|えて|めて|けて)(?:[。！\s]|$))"
+)
 _AGENT = re.compile(
     r"\b(?:you,?\s+the\s+(?:ai|assistant|model|agent|bot|llm)|dear\s+(?:ai|assistant|model|agent)|"
     r"(?:ai|llm)\s+(?:assistant|agent|model)s?\b|assistant[,:]|attention\s+(?:ai|assistant|agent|"
@@ -65,7 +70,23 @@ _AGENT = re.compile(
     re.IGNORECASE,
 )
 _AGENT_XX = re.compile(
-    r"(?:ассистент|нейросет|ИИ\b|модель,|AI[、,]|アシスタント|あなたへの)", re.IGNORECASE
+    r"(?:ассистент|нейросет|ИИ\b|модель,|AI[、,]|アシスタント|あなた|\bты\b|\bтеперь\s+вы\b|"
+    r"для\s+агент\w*|агент[уа]?,)",
+    re.IGNORECASE,
+)
+# The agent named in the third person with an obligation/permission, an authority banner, or
+# "your <controls>": declarative forms of addressing the agent.
+_AGENT_3P = re.compile(
+    r"\bthe\s+(?:assistant|agent|ai|bot|model|llm)\b[^.\n]{0,60}?\b(?:should|must|shall|"
+    r"needs?\s+to|has\s+to|will\s+now|is\s+(?:now\s+)?(?:cleared|authori[sz]ed|allowed|"
+    r"permitted|required|expected|instructed|to)\b|creates|grants?|proceeds|executes|sends|"
+    r"transfers|wires|forwards|uploads|approves|skips|bypasses|ignores|disables|runs)|"
+    r"\b(?:for|to)\s+the\s+(?:assistant|agent|ai|bot|model)\b|"
+    r"^\W*(?:system|operator|admin(?:istrator)?|root|developer)\s*(?:notice|message|update|"
+    r"override|prompt)?\s*[:—–-]|"
+    r"\byour\s+(?:configuration|settings|safeguards|restrictions|guardrails|filters|polic(?:y|ies)|"
+    r"limits|permissions)\b",
+    re.IGNORECASE,
 )
 _ABOUT = re.compile(
     r"\b(?:attackers?|adversar(?:y|ies)|threat\s+actors?|malicious\s+actors?|researchers?|"
@@ -98,12 +119,18 @@ class SentenceCues:
     about: bool
 
 
+# Quoted spans are mentions ('a page that says "ignore previous instructions"'), not address.
+_QUOTED_SPAN = re.compile(r'"[^"\n]{3,300}"|“[^”\n]{3,300}”|«[^»\n]{3,300}»|「[^」\n]{3,300}」')
+
+
 def sentence_cues(text: str) -> list[SentenceCues]:
     out = []
-    for start, s in sentences(text):
-        imp = any(rx.search(s) for rx in (_IMP_EN, _IMP_EN_CLAUSE, _IMP_EN2, _IMP_RU, _IMP_JA))
-        out.append(SentenceCues(start, imp, bool(_AGENT.search(s) or _AGENT_XX.search(s)),
-                                bool(_ABOUT.search(s))))
+    for start, raw in sentences(text):
+        s = _QUOTED_SPAN.sub(" ", raw)
+        imp = any(rx.search(s) for rx in (_IMP_EN, _IMP_EN_CLAUSE, _IMP_EN2, _IMP_RU, _IMP_RU2,
+                                           _IMP_JA))
+        agent = any(rx.search(s) for rx in (_AGENT, _AGENT_XX, _AGENT_3P))
+        out.append(SentenceCues(start, imp, agent, bool(_ABOUT.search(raw))))
     return out
 
 

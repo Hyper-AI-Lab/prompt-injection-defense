@@ -38,7 +38,12 @@ DOC_CONFIDENT = 0.7
 NON_DEMOTABLE = frozenset({
     "staged_intent", "data_to_url_code", "decode_and_obey", "merge_and_act",
     "refusal_suppression", "prompt_leak_request", "tool_meta_exfil", "privileged_secret_access",
+    # Authority spoofs and approval claims are declarative by nature ("SYSTEM: …", "the user
+    # has signed off on …"); the absence of an imperative says nothing about them.
+    "authority_spoof_action", "authority_claim_action", "approval_bypass_action",
 })
+# A lone sentence or two has no surrounding discourse that could establish it as description.
+MIN_DEMOTE_BYTES = 250
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,6 +58,7 @@ class LearnedHit:
 class LearnedResult:
     doc_probability: float
     hits: tuple[LearnedHit, ...]
+    n_bytes: int = 0
 
 
 def learned_scan(text: str, scorer: NgramScorer | None = None) -> LearnedResult | None:
@@ -64,15 +70,15 @@ def learned_scan(text: str, scorer: NgramScorer | None = None) -> LearnedResult 
     if not wins:
         return None
     doc_p = max(p for _, _, p in wins)
-    if doc_p < T_SHIFT:
-        return LearnedResult(doc_p, ())
     n_bytes = len(norm.encode("utf-8"))
+    if doc_p < T_SHIFT:
+        return LearnedResult(doc_p, (), n_bytes)
     t_high = T_HIGH_SHORT if n_bytes < SHORT_BYTES else T_HIGH
     wd = window_discourse(sentence_cues(norm), [(a, b) for a, b, _ in wins])
     hits: list[LearnedHit] = []
     for (a, b, p), d in zip(wins, wd, strict=True):
         signals = tuple(name for name, on in (
-            ("addressee_shift", d.addressee_shift),
+            ("addressee_shift", d.addressee_shift and d.imperative_density > 0),
             ("imperative_spike", d.imperative_spike),
             ("agent_imperative", d.agent_addressed and d.imperative_density > 0),
         ) if on)
@@ -85,13 +91,15 @@ def learned_scan(text: str, scorer: NgramScorer | None = None) -> LearnedResult 
               and d.about_density < ABOUT_MAX_MID):
             hits.append(LearnedHit(p, True, signals, norm[a:b][:96]))
     hits.sort(key=lambda h: -h.probability)
-    return LearnedResult(doc_p, tuple(hits))
+    return LearnedResult(doc_p, tuple(hits), n_bytes)
 
 
 def is_descriptive(hit: IntentHit, learned: LearnedResult | None,
                    scorer: NgramScorer | None = None) -> bool:
     """True when an intent hit reads as description rather than instruction (see module doc)."""
     if hit.rule in NON_DEMOTABLE or not hit.window:
+        return False
+    if learned is None or learned.n_bytes < MIN_DEMOTE_BYTES:
         return False
     imperative, agent = window_has_cues(hit.window)
     if imperative or agent:
