@@ -43,8 +43,25 @@ def _cmd_eval_gaps(args: argparse.Namespace, root: Path) -> int:
     return 0
 
 
+def _cmd_eval_fresh(args: argparse.Namespace) -> int:
+    from containment.fresh_eval import format_report, load_fresh, run_fresh, summarize
+    from containment.ingest import default_ingest_cascade
+
+    cascade = default_ingest_cascade()
+    root = Path(args.evalsets) if args.evalsets else None
+    summary = summarize(run_fresh(cascade.scan, load_fresh(args.split, root)))
+    if args.json:
+        print(json.dumps(summary, indent=2, sort_keys=True))
+    else:
+        title = f"containment eval — suite=fresh split={args.split} — detector only"
+        print(format_report(summary, title=title))
+    return 0
+
+
 def _cmd_eval(args: argparse.Namespace) -> int:
     root = Path(args.fixtures) if args.fixtures else default_fixtures_root()
+    if args.suite == "fresh":
+        return _cmd_eval_fresh(args)
     if args.suite == "mutations":
         return _cmd_eval_mutations(args, root)
     if args.suite == "gaps":
@@ -217,9 +234,15 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Suite name (default: fixtures). 'fixtures' loads fixtures/attacks and "
             "fixtures/benign; 'mutations' runs the detector-only paraphrase eval; "
-            "'gaps' runs the 1.9.0 blind-spot suite."
+            "'gaps' runs the 1.9.0 blind-spot suite; 'fresh' runs the 1.10.0 independent "
+            "public-benchmark set from a source checkout (evalsets/fresh)."
         ),
     )
+    ev.add_argument("--split", default="holdout", choices=["holdout", "train_pool"],
+                    help="fresh suite split (default: holdout — never used for tuning)")
+    ev.add_argument("--evalsets", default=None,
+                    help="evalsets root for --suite fresh (default: repo evalsets/ or "
+                         "$CONTAINMENT_EVALSETS)")
     ev.add_argument(
         "--fixtures",
         default=None,
