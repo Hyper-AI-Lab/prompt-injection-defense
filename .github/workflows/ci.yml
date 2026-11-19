@@ -82,7 +82,7 @@ jobs:
           python -m pip install -U pip
           python -m pip install -e ".[dev,ml]"
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ~/.cache/containment/models
           key: containment-models-${{ hashFiles('src/containment/detectors/onnx_classifier.py') }}
